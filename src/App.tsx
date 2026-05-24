@@ -7,6 +7,7 @@ import {
   Bot,
   ChevronDown,
   Clipboard,
+  Crown,
   Dumbbell,
   Play,
   RotateCcw,
@@ -15,6 +16,7 @@ import {
   UserRoundCheck,
   Zap
 } from "lucide-react";
+import { getPlayerDisplayName } from "./data/displayNames";
 import { comparisonMetrics } from "./data/metrics";
 import { celticsPlayers, lebronJames } from "./data/players";
 import { dataSnapshotDate, sourceCatalog } from "./data/sources";
@@ -28,6 +30,7 @@ import {
   resolveAutoBattle,
   resolveRound
 } from "./game/resolveRound";
+import { buildHonorComparison, type HonorScoreRow } from "./game/honorScore";
 
 const params = new URLSearchParams(window.location.search);
 const initialOpponentId = params.get("opponent");
@@ -63,6 +66,7 @@ function PlayerPanel({
   side: "james" | "opponent";
   active: boolean;
 }) {
+  const displayName = getPlayerDisplayName(player);
   const topHonors = [
     ["冠", player.honors.championships],
     ["MVP", player.honors.mvps],
@@ -83,7 +87,7 @@ function PlayerPanel({
       </div>
       <div className="fighter-name-row">
         <div>
-          <h2>{player.name}</h2>
+          <h2>{displayName}</h2>
           <p>{player.position}</p>
         </div>
         <div className="danger-chip" aria-label={`危险等级 ${player.advanced.dangerLevel}`}>
@@ -96,7 +100,7 @@ function PlayerPanel({
           <span>生命</span>
           <strong>{hp}</strong>
         </div>
-        <div className="hp-track" aria-label={`${player.name} 生命值 ${hp}`}>
+        <div className="hp-track" aria-label={`${displayName} 生命值 ${hp}`}>
           <span style={{ width: `${hp}%` }} />
         </div>
       </div>
@@ -162,7 +166,7 @@ function OpponentPicker({
           >
             <span className="rank">#{player.rankSource.rank}</span>
             <span className="mini-silhouette" aria-hidden="true" />
-            <strong>{player.name}</strong>
+            <strong>{getPlayerDisplayName(player)}</strong>
             <small>{player.summaryTags[0]}</small>
           </button>
         ))}
@@ -203,6 +207,7 @@ function ManualControls({
 
 function BattleLog({ state }: { state: BattleState }) {
   const latest = state.log[0];
+  const opponentName = getPlayerDisplayName(state.opponent);
 
   return (
     <section className="log-panel">
@@ -226,14 +231,14 @@ function BattleLog({ state }: { state: BattleState }) {
             </span>
             <ArrowRightLeft size={18} />
             <span>
-              {state.opponent.name}
+              {opponentName}
               <strong>{formatValue(latest.opponentValue)}</strong>
             </span>
           </div>
           <p>{latest.line}</p>
           <div className="damage-line">
             <Zap size={16} />
-            {latest.winner === "james" ? state.opponent.name : "詹姆斯"} 受到 {latest.damage} 点伤害
+            {latest.winner === "james" ? opponentName : "詹姆斯"} 受到 {latest.damage} 点伤害
           </div>
         </article>
       ) : (
@@ -247,9 +252,88 @@ function BattleLog({ state }: { state: BattleState }) {
           <div key={`${round.round}-${round.metric.id}`} className="round-row">
             <span>R{round.round}</span>
             <strong>{round.metric.label}</strong>
-            <em>{round.winner === "james" ? "詹姆斯" : state.opponent.name} +{round.damage}</em>
+            <em>{round.winner === "james" ? "詹姆斯" : opponentName} +{round.damage}</em>
           </div>
         ))}
+      </div>
+    </section>
+  );
+}
+
+function HonorTickerRow({
+  row,
+  opponentName
+}: {
+  row: HonorScoreRow;
+  opponentName: string;
+}) {
+  const leaderText =
+    row.leader === "james" ? "詹姆斯领先" : row.leader === "opponent" ? `${opponentName} 领先` : "双方打平";
+
+  return (
+    <div className={`honor-ticker-row ${row.leader}`}>
+      <span>{row.label}</span>
+      <strong>
+        詹姆斯 {row.jamesValue}
+        {row.unit}
+      </strong>
+      <em>
+        {opponentName} {row.opponentValue}
+        {row.unit}
+      </em>
+      <b>{leaderText}</b>
+    </div>
+  );
+}
+
+function HonorComparisonBoard({ opponent }: { opponent: PlayerCard }) {
+  const opponentName = getPlayerDisplayName(opponent);
+  const comparison = useMemo(() => buildHonorComparison(lebronJames, opponent), [opponent]);
+  const visibleRows = comparison.rows.filter((row) => row.jamesValue > 0 || row.opponentValue > 0);
+  const tickerRows = [...visibleRows, ...visibleRows];
+  const maxScore = Math.max(comparison.jamesScore, comparison.opponentScore, 1);
+  const winnerText =
+    comparison.winner === "james"
+      ? "荣誉总分：詹姆斯压住这一局"
+      : comparison.winner === "opponent"
+        ? `荣誉总分：${opponentName} 顶住门面`
+        : "荣誉总分：双方平手";
+
+  return (
+    <section className="honor-board">
+      <div className="section-title">
+        <div>
+          <span>荣誉对比</span>
+          <h3>选中 {opponentName} 后的荣誉滚动榜</h3>
+        </div>
+        <Crown size={22} />
+      </div>
+      <div className="honor-score-card">
+        <div className="score-side james-score">
+          <span>勒布朗·詹姆斯</span>
+          <strong>{comparison.jamesScore}</strong>
+          <div className="score-track">
+            <i style={{ width: `${(comparison.jamesScore / maxScore) * 100}%` }} />
+          </div>
+        </div>
+        <div className="score-verdict">
+          <b>{winnerText}</b>
+          <small>总分 = 荣誉次数 × 权重</small>
+        </div>
+        <div className="score-side opponent-score">
+          <span>{opponentName}</span>
+          <strong>{comparison.opponentScore}</strong>
+          <div className="score-track">
+            <i style={{ width: `${(comparison.opponentScore / maxScore) * 100}%` }} />
+          </div>
+        </div>
+      </div>
+      <div className="honor-ticker" aria-label="荣誉滚动播放">
+        <div className="honor-ticker-track">
+          {tickerRows.map((row, index) => (
+            <HonorTickerRow key={`${row.key}-${index}`} row={row} opponentName={opponentName} />
+          ))}
+        </div>
       </div>
     </section>
   );
@@ -264,6 +348,7 @@ function DetailsDrawer({
   opponent: PlayerCard;
   onClose: () => void;
 }) {
+  const opponentName = getPlayerDisplayName(opponent);
   const rows = comparisonMetrics
     .map((metric) => ({
       metric,
@@ -278,7 +363,7 @@ function DetailsDrawer({
         <div className="drawer-head">
           <div>
             <span>数据详情</span>
-            <h3>詹姆斯 vs {opponent.name}</h3>
+            <h3>詹姆斯 vs {opponentName}</h3>
           </div>
           <button className="text-button" type="button" onClick={onClose}>
             收起
@@ -396,10 +481,11 @@ export default function App() {
   };
 
   const activeSide = state.log[0]?.winner === "opponent" ? "opponent" : "james";
+  const opponentName = getPlayerDisplayName(opponent);
   const resultText = state.finished
     ? state.jamesHp > state.opponentHp
       ? "詹姆斯拿下这局"
-      : `${opponent.name} 守住绿军门面`
+      : `${opponentName} 守住绿军门面`
     : mode === "auto"
       ? "自动模式会一键打完全场"
       : "手动模式每回合由你选数据项";
@@ -455,6 +541,7 @@ export default function App() {
       <section className="main-grid">
         <OpponentPicker selected={opponent} onPick={pickOpponent} onSeedPick={chooseSeededOpponent} />
         <div className="battle-column">
+          <HonorComparisonBoard opponent={opponent} />
           {mode === "manual" && (
             <ManualControls metrics={manualMetrics} disabled={state.finished} onResolve={resolveManual} />
           )}

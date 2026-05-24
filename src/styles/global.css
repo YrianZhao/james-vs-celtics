@@ -473,7 +473,8 @@ button:disabled {
 
 .picker-panel,
 .manual-panel,
-.log-panel {
+.log-panel,
+.honor-board {
   min-width: 0;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -482,7 +483,8 @@ button:disabled {
 
 .picker-panel,
 .manual-panel,
-.log-panel {
+.log-panel,
+.honor-board {
   padding: 14px;
 }
 
@@ -575,6 +577,180 @@ button:disabled {
 .battle-column {
   display: grid;
   gap: 14px;
+}
+
+.honor-board {
+  overflow: hidden;
+}
+
+.honor-score-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(170px, 0.7fr) minmax(0, 1fr);
+  gap: 10px;
+  align-items: stretch;
+}
+
+.score-side,
+.score-verdict {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.score-side {
+  display: grid;
+  gap: 8px;
+  align-content: center;
+}
+
+.score-side span,
+.score-verdict small {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.score-side strong {
+  color: var(--ink);
+  font-size: clamp(2rem, 6vw, 3.4rem);
+  line-height: 1;
+}
+
+.score-track {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.score-track i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.james-score .score-track i {
+  background: linear-gradient(90deg, var(--gold), #f28b47);
+}
+
+.opponent-score .score-track i {
+  background: linear-gradient(90deg, var(--green), #9be37f);
+}
+
+.score-verdict {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.score-verdict b {
+  color: var(--gold);
+  line-height: 1.35;
+}
+
+.honor-ticker {
+  position: relative;
+  height: 190px;
+  overflow: hidden;
+  margin-top: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.honor-ticker::before,
+.honor-ticker::after {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  left: 0;
+  right: 0;
+  height: 30px;
+  pointer-events: none;
+}
+
+.honor-ticker::before {
+  top: 0;
+  background: linear-gradient(180deg, rgba(24, 27, 31, 0.96), transparent);
+}
+
+.honor-ticker::after {
+  bottom: 0;
+  background: linear-gradient(0deg, rgba(24, 27, 31, 0.96), transparent);
+}
+
+.honor-ticker-track {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  animation: honor-scroll 22s linear infinite;
+}
+
+.honor-ticker:hover .honor-ticker-track {
+  animation-play-state: paused;
+}
+
+.honor-ticker-row {
+  display: grid;
+  grid-template-columns: minmax(92px, 1fr) minmax(86px, 1fr) minmax(86px, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  min-height: 42px;
+  padding: 9px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.honor-ticker-row span {
+  color: var(--ink);
+  font-weight: 900;
+}
+
+.honor-ticker-row strong,
+.honor-ticker-row em,
+.honor-ticker-row b {
+  font-size: 0.84rem;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.honor-ticker-row strong {
+  color: var(--gold);
+}
+
+.honor-ticker-row em {
+  color: #9be37f;
+}
+
+.honor-ticker-row b {
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.honor-ticker-row.james b {
+  color: var(--gold);
+}
+
+.honor-ticker-row.opponent b {
+  color: #9be37f;
+}
+
+@keyframes honor-scroll {
+  from {
+    transform: translateY(0);
+  }
+
+  to {
+    transform: translateY(-50%);
+  }
 }
 
 .metric-grid {
@@ -914,6 +1090,27 @@ button:disabled {
     min-width: 148px;
     scroll-snap-align: start;
   }
+
+  .honor-score-card {
+    grid-template-columns: 1fr;
+  }
+
+  .score-verdict {
+    min-height: 74px;
+  }
+
+  .honor-ticker {
+    height: 236px;
+  }
+
+  .honor-ticker-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .honor-ticker-row span,
+  .honor-ticker-row b {
+    grid-column: 1 / -1;
+  }
 }
 
 @media (max-width: 560px) {
@@ -967,6 +1164,10 @@ button:disabled {
 
   .metric-grid {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .honor-ticker-row {
+    min-height: 82px;
   }
 
   .metric-grid button {
