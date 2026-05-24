@@ -1,0 +1,474 @@
+import { useEffect, useMemo, useState } from "react";
+import {
+  Activity,
+  ArrowRightLeft,
+  BadgeInfo,
+  BookOpen,
+  Bot,
+  ChevronDown,
+  Clipboard,
+  Dumbbell,
+  Play,
+  RotateCcw,
+  Swords,
+  Trophy,
+  UserRoundCheck,
+  Zap
+} from "lucide-react";
+import { comparisonMetrics } from "./data/metrics";
+import { celticsPlayers, lebronJames } from "./data/players";
+import { dataSnapshotDate, sourceCatalog } from "./data/sources";
+import type { BattleMode, ComparisonMetric, PlayerCard } from "./data/types";
+import { createShareSeed, pickBySeed } from "./game/random";
+import {
+  type BattleState,
+  createBattleState,
+  formatValue,
+  getAvailableMetrics,
+  resolveAutoBattle,
+  resolveRound
+} from "./game/resolveRound";
+
+const params = new URLSearchParams(window.location.search);
+const initialOpponentId = params.get("opponent");
+const initialMode = params.get("mode") === "manual" ? "manual" : "auto";
+const initialSeed = params.get("seed") ?? createShareSeed();
+
+function hpTone(value: number) {
+  if (value > 60) return "healthy";
+  if (value > 28) return "warning";
+  return "danger";
+}
+
+function getMetricValue(player: PlayerCard, metric: ComparisonMetric) {
+  if (metric.kind === "honor") {
+    return player.honors[metric.key as keyof PlayerCard["honors"]];
+  }
+
+  if (metric.kind === "legacy") {
+    return player.advanced[metric.key as keyof PlayerCard["advanced"]];
+  }
+
+  return player.careerTotals[metric.key as keyof PlayerCard["careerTotals"]];
+}
+
+function PlayerPanel({
+  player,
+  hp,
+  side,
+  active
+}: {
+  player: PlayerCard;
+  hp: number;
+  side: "james" | "opponent";
+  active: boolean;
+}) {
+  const topHonors = [
+    ["冠", player.honors.championships],
+    ["MVP", player.honors.mvps],
+    ["FMVP", player.honors.finalsMvps],
+    ["全明星", player.honors.allStars]
+  ].filter(([, value]) => Number(value) > 0);
+
+  return (
+    <section className={`fighter-panel ${side} ${active ? "is-active" : ""}`}>
+      <div className="fighter-bg" aria-hidden="true">
+        <span className="court-line line-a" />
+        <span className="court-line line-b" />
+        <span className="player-silhouette" />
+      </div>
+      <div className="fighter-topline">
+        <span className="side-label">{side === "james" ? "你的阵营" : "凯尔特人对手"}</span>
+        <span className="era-badge">{player.era}</span>
+      </div>
+      <div className="fighter-name-row">
+        <div>
+          <h2>{player.name}</h2>
+          <p>{player.position}</p>
+        </div>
+        <div className="danger-chip" aria-label={`危险等级 ${player.advanced.dangerLevel}`}>
+          <Zap size={16} />
+          {player.advanced.dangerLevel}
+        </div>
+      </div>
+      <div className={`hp-wrap ${hpTone(hp)}`}>
+        <div className="hp-text">
+          <span>生命</span>
+          <strong>{hp}</strong>
+        </div>
+        <div className="hp-track" aria-label={`${player.name} 生命值 ${hp}`}>
+          <span style={{ width: `${hp}%` }} />
+        </div>
+      </div>
+      <div className="tag-row">
+        {player.summaryTags.slice(0, 4).map((tag) => (
+          <span key={tag}>{tag}</span>
+        ))}
+      </div>
+      <div className="honor-strip">
+        {topHonors.map(([label, value]) => (
+          <span key={label}>
+            <strong>{value}</strong>
+            {label}
+          </span>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ModeSwitch({ mode, onChange }: { mode: BattleMode; onChange: (mode: BattleMode) => void }) {
+  return (
+    <div className="mode-switch" role="tablist" aria-label="对战模式">
+      <button className={mode === "manual" ? "active" : ""} onClick={() => onChange("manual")} type="button">
+        <UserRoundCheck size={16} />
+        手动选项
+      </button>
+      <button className={mode === "auto" ? "active" : ""} onClick={() => onChange("auto")} type="button">
+        <Bot size={16} />
+        自动对战
+      </button>
+    </div>
+  );
+}
+
+function OpponentPicker({
+  selected,
+  onPick,
+  onSeedPick
+}: {
+  selected: PlayerCard;
+  onPick: (player: PlayerCard) => void;
+  onSeedPick: () => void;
+}) {
+  return (
+    <section className="picker-panel">
+      <div className="section-title">
+        <div>
+          <span>卡池选择</span>
+          <h3>挑一张绿军对手卡</h3>
+        </div>
+        <button className="icon-button" onClick={onSeedPick} type="button" aria-label="按种子抽一张">
+          <RotateCcw size={18} />
+        </button>
+      </div>
+      <div className="card-grid" aria-label="凯尔特人球星卡池">
+        {celticsPlayers.map((player) => (
+          <button
+            className={`opponent-card ${selected.id === player.id ? "selected" : ""}`}
+            key={player.id}
+            onClick={() => onPick(player)}
+            type="button"
+          >
+            <span className="rank">#{player.rankSource.rank}</span>
+            <span className="mini-silhouette" aria-hidden="true" />
+            <strong>{player.name}</strong>
+            <small>{player.summaryTags[0]}</small>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ManualControls({
+  metrics,
+  disabled,
+  onResolve
+}: {
+  metrics: ComparisonMetric[];
+  disabled: boolean;
+  onResolve: (metricId: string) => void;
+}) {
+  return (
+    <section className="manual-panel">
+      <div className="section-title compact">
+        <div>
+          <span>手动模式</span>
+          <h3>选择这一回合的对比项</h3>
+        </div>
+        <Dumbbell size={20} />
+      </div>
+      <div className="metric-grid">
+        {metrics.map((metric) => (
+          <button key={metric.id} disabled={disabled} onClick={() => onResolve(metric.id)} type="button">
+            <span>{metric.sourceLabel}</span>
+            <strong>{metric.label}</strong>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function BattleLog({ state }: { state: BattleState }) {
+  const latest = state.log[0];
+
+  return (
+    <section className="log-panel">
+      <div className="section-title compact">
+        <div>
+          <span>战报</span>
+          <h3>{state.finished ? "比赛结束" : latest ? `第 ${latest.round} 回合` : "等待开火"}</h3>
+        </div>
+        <Activity size={20} />
+      </div>
+      {latest ? (
+        <article className={`latest-round ${latest.winner}`}>
+          <div className="round-header">
+            <span>{latest.metric.sourceLabel}</span>
+            <strong>{latest.metric.label}</strong>
+          </div>
+          <div className="score-compare">
+            <span>
+              詹姆斯
+              <strong>{formatValue(latest.jamesValue)}</strong>
+            </span>
+            <ArrowRightLeft size={18} />
+            <span>
+              {state.opponent.name}
+              <strong>{formatValue(latest.opponentValue)}</strong>
+            </span>
+          </div>
+          <p>{latest.line}</p>
+          <div className="damage-line">
+            <Zap size={16} />
+            {latest.winner === "james" ? state.opponent.name : "詹姆斯"} 受到 {latest.damage} 点伤害
+          </div>
+        </article>
+      ) : (
+        <div className="empty-log">
+          <Swords size={28} />
+          <p>选择对手和模式后开战。自动模式会自己打完全场，手动模式由你挑每回合的数据项。</p>
+        </div>
+      )}
+      <div className="round-list">
+        {state.log.slice(1, 7).map((round) => (
+          <div key={`${round.round}-${round.metric.id}`} className="round-row">
+            <span>R{round.round}</span>
+            <strong>{round.metric.label}</strong>
+            <em>{round.winner === "james" ? "詹姆斯" : state.opponent.name} +{round.damage}</em>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function DetailsDrawer({
+  open,
+  opponent,
+  onClose
+}: {
+  open: boolean;
+  opponent: PlayerCard;
+  onClose: () => void;
+}) {
+  const rows = comparisonMetrics
+    .map((metric) => ({
+      metric,
+      james: getMetricValue(lebronJames, metric),
+      opponent: getMetricValue(opponent, metric)
+    }))
+    .filter((row) => typeof row.james === "number" && typeof row.opponent === "number");
+
+  return (
+    <div className={`drawer-backdrop ${open ? "open" : ""}`} onClick={onClose}>
+      <aside className="details-drawer" onClick={(event) => event.stopPropagation()} aria-hidden={!open}>
+        <div className="drawer-head">
+          <div>
+            <span>数据详情</span>
+            <h3>詹姆斯 vs {opponent.name}</h3>
+          </div>
+          <button className="text-button" type="button" onClick={onClose}>
+            收起
+            <ChevronDown size={16} />
+          </button>
+        </div>
+        <div className="detail-table">
+          {rows.map((row) => (
+            <div key={row.metric.id} className="detail-row">
+              <span>{row.metric.label}</span>
+              <strong>{formatValue(row.james)}</strong>
+              <em>{formatValue(row.opponent)}</em>
+            </div>
+          ))}
+        </div>
+        <div className="source-list">
+          <h4>本场来源入口</h4>
+          {[...new Set([...lebronJames.sourceUrls, ...opponent.sourceUrls])].map((url) => (
+            <a href={url} key={url} target="_blank" rel="noreferrer">
+              {url}
+            </a>
+          ))}
+        </div>
+      </aside>
+    </div>
+  );
+}
+
+function SourcesModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  if (!open) return null;
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <section className="sources-modal" onClick={(event) => event.stopPropagation()}>
+        <div className="drawer-head">
+          <div>
+            <span>数据来源</span>
+            <h3>快照日期 {dataSnapshotDate}</h3>
+          </div>
+          <button className="text-button" type="button" onClick={onClose}>
+            关闭
+          </button>
+        </div>
+        <p>
+          本游戏使用公开资料中常见的核心荣誉与生涯总计做可玩化快照。低位卡不追求逐小数精确，重点是让手机和电脑都能打开就玩。
+        </p>
+        <div className="source-list">
+          {sourceCatalog.map((source) => (
+            <a href={source.url} key={source.url} target="_blank" rel="noreferrer">
+              <BookOpen size={16} />
+              {source.label}
+            </a>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function buildShareUrl(opponent: PlayerCard, mode: BattleMode, seed: string) {
+  const url = new URL(window.location.href);
+  url.searchParams.set("opponent", opponent.id);
+  url.searchParams.set("mode", mode);
+  url.searchParams.set("seed", seed);
+  return url.toString();
+}
+
+export default function App() {
+  const seededOpponent = useMemo(() => pickBySeed(celticsPlayers, initialSeed), []);
+  const [opponent, setOpponent] = useState(
+    celticsPlayers.find((player) => player.id === initialOpponentId) ?? seededOpponent
+  );
+  const [mode, setMode] = useState<BattleMode>(initialMode);
+  const [seed, setSeed] = useState(initialSeed);
+  const [state, setState] = useState(() => createBattleState(lebronJames, opponent, mode, seed));
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [sourcesOpen, setSourcesOpen] = useState(false);
+  const [shareState, setShareState] = useState("复制链接");
+
+  const manualMetrics = useMemo(() => getAvailableMetrics(lebronJames, opponent), [opponent]);
+
+  useEffect(() => {
+    setState(createBattleState(lebronJames, opponent, mode, seed));
+  }, [opponent, mode, seed]);
+
+  const startBattle = () => {
+    const fresh = createBattleState(lebronJames, opponent, mode, seed);
+    setState(mode === "auto" ? resolveAutoBattle(fresh) : fresh);
+  };
+
+  const resolveManual = (metricId: string) => {
+    setState((current) => resolveRound(current, metricId));
+  };
+
+  const chooseSeededOpponent = () => {
+    const nextSeed = createShareSeed();
+    setSeed(nextSeed);
+    setOpponent(pickBySeed(celticsPlayers, nextSeed));
+  };
+
+  const pickOpponent = (player: PlayerCard) => {
+    setOpponent(player);
+    setSeed(createShareSeed());
+  };
+
+  const restart = () => {
+    setState(createBattleState(lebronJames, opponent, mode, seed));
+  };
+
+  const copyShare = async () => {
+    const url = buildShareUrl(opponent, mode, seed);
+    await navigator.clipboard.writeText(url);
+    setShareState("已复制");
+    window.setTimeout(() => setShareState("复制链接"), 1400);
+  };
+
+  const activeSide = state.log[0]?.winner === "opponent" ? "opponent" : "james";
+  const resultText = state.finished
+    ? state.jamesHp > state.opponentHp
+      ? "詹姆斯拿下这局"
+      : `${opponent.name} 守住绿军门面`
+    : mode === "auto"
+      ? "自动模式会一键打完全场"
+      : "手动模式每回合由你选数据项";
+
+  return (
+    <main className="app-shell">
+      <header className="app-header">
+        <div>
+          <span className="eyebrow">Open-source card battle</span>
+          <h1>詹姆斯 VS 凯尔特人</h1>
+          <p>手机上下分屏，电脑左右对战。你永远是詹姆斯，对面从绿军传奇卡池里挑。</p>
+        </div>
+        <div className="header-actions">
+          <button className="ghost-button" type="button" onClick={() => setSourcesOpen(true)}>
+            <BadgeInfo size={18} />
+            来源
+          </button>
+          <button className="ghost-button" type="button" onClick={copyShare}>
+            <Clipboard size={18} />
+            {shareState}
+          </button>
+        </div>
+      </header>
+
+      <section className="arena">
+        <PlayerPanel player={lebronJames} hp={state.jamesHp} side="james" active={activeSide === "james"} />
+        <div className="versus-core">
+          <span className="vs-token">VS</span>
+          <strong>{resultText}</strong>
+          <small>Seed {seed}</small>
+        </div>
+        <PlayerPanel player={opponent} hp={state.opponentHp} side="opponent" active={activeSide === "opponent"} />
+      </section>
+
+      <section className="control-bar">
+        <ModeSwitch mode={mode} onChange={setMode} />
+        <div className="primary-actions">
+          <button className="primary-button" type="button" onClick={startBattle}>
+            <Play size={18} />
+            {mode === "auto" ? "自动开战" : state.round === 0 ? "开始手动战" : "重开本局"}
+          </button>
+          <button className="secondary-button" type="button" onClick={restart}>
+            <RotateCcw size={18} />
+            重置
+          </button>
+          <button className="secondary-button" type="button" onClick={() => setDetailsOpen(true)}>
+            <Trophy size={18} />
+            数据详情
+          </button>
+        </div>
+      </section>
+
+      <section className="main-grid">
+        <OpponentPicker selected={opponent} onPick={pickOpponent} onSeedPick={chooseSeededOpponent} />
+        <div className="battle-column">
+          {mode === "manual" && (
+            <ManualControls metrics={manualMetrics} disabled={state.finished} onResolve={resolveManual} />
+          )}
+          <BattleLog state={state} />
+        </div>
+      </section>
+
+      <footer className="app-footer">
+        <span>非官方球迷作品，不使用官方 Logo 或球员照片。</span>
+        <span>数据快照：{dataSnapshotDate}</span>
+      </footer>
+
+      <DetailsDrawer open={detailsOpen} opponent={opponent} onClose={() => setDetailsOpen(false)} />
+      <SourcesModal open={sourcesOpen} onClose={() => setSourcesOpen(false)} />
+    </main>
+  );
+}
