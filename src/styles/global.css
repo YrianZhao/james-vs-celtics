@@ -433,6 +433,107 @@ button:disabled {
   background: rgba(24, 27, 31, 0.78);
 }
 
+.selection-intro {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(260px, 0.7fr);
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.selection-hero-card,
+.selected-opponent-card,
+.selection-controls {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(24, 27, 31, 0.86);
+  box-shadow: var(--shadow);
+}
+
+.selection-hero-card {
+  position: relative;
+  overflow: hidden;
+  min-height: 270px;
+  padding: 22px;
+  background:
+    radial-gradient(circle at 86% 36%, rgba(227, 187, 98, 0.18), transparent 16rem),
+    linear-gradient(145deg, rgba(92, 54, 17, 0.78), rgba(24, 27, 31, 0.94));
+}
+
+.selection-hero-card h2 {
+  margin: 8px 0 12px;
+  font-size: clamp(2.6rem, 8vw, 6rem);
+  line-height: 0.95;
+}
+
+.selection-hero-card p {
+  max-width: 720px;
+  margin: 0;
+  color: rgba(244, 240, 232, 0.82);
+  line-height: 1.75;
+}
+
+.selection-stat-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.selection-stat-row span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.22);
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.selection-stat-row strong {
+  color: var(--gold);
+  font-size: 1.35rem;
+}
+
+.selected-opponent-card {
+  display: grid;
+  align-content: end;
+  min-height: 270px;
+  padding: 18px;
+  background:
+    radial-gradient(circle at 70% 26%, rgba(31, 179, 106, 0.24), transparent 13rem),
+    linear-gradient(145deg, rgba(18, 92, 57, 0.74), rgba(24, 27, 31, 0.94));
+}
+
+.selected-opponent-card span {
+  color: var(--gold);
+  font-size: 0.8rem;
+  font-weight: 900;
+}
+
+.selected-opponent-card strong {
+  margin-top: 8px;
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  line-height: 1;
+}
+
+.selected-opponent-card small {
+  margin-top: 12px;
+  color: rgba(244, 240, 232, 0.72);
+  font-weight: 800;
+  line-height: 1.5;
+}
+
+.selection-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+  padding: 12px;
+}
+
 .mode-switch {
   display: inline-grid;
   grid-template-columns: 1fr 1fr;
@@ -1025,6 +1126,7 @@ button:disabled {
 
   .app-header,
   .control-bar,
+  .selection-controls,
   .app-footer {
     flex-direction: column;
     align-items: stretch;
@@ -1043,6 +1145,10 @@ button:disabled {
   .arena {
     grid-template-columns: 1fr;
     gap: 10px;
+  }
+
+  .selection-intro {
+    grid-template-columns: 1fr;
   }
 
   .fighter-panel {
@@ -1124,6 +1230,17 @@ button:disabled {
 
   .app-header p {
     font-size: 0.94rem;
+  }
+
+  .selection-hero-card,
+  .selected-opponent-card {
+    min-height: 230px;
+    padding: 16px;
+  }
+
+  .selection-stat-row span {
+    width: 100%;
+    justify-content: space-between;
   }
 
   .fighter-panel {

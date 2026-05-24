@@ -30,7 +30,7 @@ import {
   resolveAutoBattle,
   resolveRound
 } from "./game/resolveRound";
-import { buildHonorComparison, type HonorScoreRow } from "./game/honorScore";
+import { buildFullComparison, type ComparisonScoreRow } from "./game/comparisonScore";
 
 const params = new URLSearchParams(window.location.search);
 const initialOpponentId = params.get("opponent");
@@ -260,11 +260,11 @@ function BattleLog({ state }: { state: BattleState }) {
   );
 }
 
-function HonorTickerRow({
+function DataTickerRow({
   row,
   opponentName
 }: {
-  row: HonorScoreRow;
+  row: ComparisonScoreRow;
   opponentName: string;
 }) {
   const leaderText =
@@ -274,37 +274,35 @@ function HonorTickerRow({
     <div className={`honor-ticker-row ${row.leader}`}>
       <span>{row.label}</span>
       <strong>
-        詹姆斯 {row.jamesValue}
-        {row.unit}
+        詹姆斯 {formatValue(row.jamesValue)}
       </strong>
       <em>
-        {opponentName} {row.opponentValue}
-        {row.unit}
+        {opponentName} {formatValue(row.opponentValue)}
       </em>
       <b>{leaderText}</b>
     </div>
   );
 }
 
-function HonorComparisonBoard({ opponent }: { opponent: PlayerCard }) {
+function DataComparisonBoard({ opponent }: { opponent: PlayerCard }) {
   const opponentName = getPlayerDisplayName(opponent);
-  const comparison = useMemo(() => buildHonorComparison(lebronJames, opponent), [opponent]);
+  const comparison = useMemo(() => buildFullComparison(lebronJames, opponent), [opponent]);
   const visibleRows = comparison.rows.filter((row) => row.jamesValue > 0 || row.opponentValue > 0);
   const tickerRows = [...visibleRows, ...visibleRows];
   const maxScore = Math.max(comparison.jamesScore, comparison.opponentScore, 1);
   const winnerText =
     comparison.winner === "james"
-      ? "荣誉总分：詹姆斯压住这一局"
+      ? "综合总分：詹姆斯压住这一局"
       : comparison.winner === "opponent"
-        ? `荣誉总分：${opponentName} 顶住门面`
-        : "荣誉总分：双方平手";
+        ? `综合总分：${opponentName} 顶住门面`
+        : "综合总分：双方平手";
 
   return (
     <section className="honor-board">
       <div className="section-title">
         <div>
-          <span>荣誉对比</span>
-          <h3>选中 {opponentName} 后的荣誉滚动榜</h3>
+          <span>全部数据对比</span>
+          <h3>{opponentName} vs 詹姆斯滚动数据榜</h3>
         </div>
         <Crown size={22} />
       </div>
@@ -318,7 +316,7 @@ function HonorComparisonBoard({ opponent }: { opponent: PlayerCard }) {
         </div>
         <div className="score-verdict">
           <b>{winnerText}</b>
-          <small>总分 = 荣誉次数 × 权重</small>
+          <small>总分综合荣誉、生涯数据、场均、季后赛和历史评价</small>
         </div>
         <div className="score-side opponent-score">
           <span>{opponentName}</span>
@@ -328,10 +326,10 @@ function HonorComparisonBoard({ opponent }: { opponent: PlayerCard }) {
           </div>
         </div>
       </div>
-      <div className="honor-ticker" aria-label="荣誉滚动播放">
+      <div className="honor-ticker" aria-label="全部数据滚动播放">
         <div className="honor-ticker-track">
           {tickerRows.map((row, index) => (
-            <HonorTickerRow key={`${row.key}-${index}`} row={row} opponentName={opponentName} />
+            <DataTickerRow key={`${row.id}-${index}`} row={row} opponentName={opponentName} />
           ))}
         </div>
       </div>
@@ -431,6 +429,39 @@ function buildShareUrl(opponent: PlayerCard, mode: BattleMode, seed: string) {
   return url.toString();
 }
 
+function SelectionIntro({ selected }: { selected: PlayerCard }) {
+  return (
+    <section className="selection-intro">
+      <div className="selection-hero-card">
+        <span className="eyebrow">你的固定阵营</span>
+        <h2>勒布朗·詹姆斯</h2>
+        <p>先选一张凯尔特人球星卡，点击开战后进入完整对战界面，系统会滚动播放两人的全部数据对比。</p>
+        <div className="selection-stat-row">
+          <span>
+            <strong>{lebronJames.honors.championships}</strong>
+            总冠军
+          </span>
+          <span>
+            <strong>{lebronJames.honors.mvps}</strong>
+            MVP
+          </span>
+          <span>
+            <strong>{formatValue(lebronJames.careerTotals.points)}</strong>
+            总得分
+          </span>
+        </div>
+      </div>
+      <div className="selected-opponent-card">
+        <span>当前对手</span>
+        <strong>{getPlayerDisplayName(selected)}</strong>
+        <small>
+          #{selected.rankSource.rank} · {selected.summaryTags.slice(0, 3).join(" / ")}
+        </small>
+      </div>
+    </section>
+  );
+}
+
 export default function App() {
   const seededOpponent = useMemo(() => pickBySeed(celticsPlayers, initialSeed), []);
   const [opponent, setOpponent] = useState(
@@ -439,6 +470,7 @@ export default function App() {
   const [mode, setMode] = useState<BattleMode>(initialMode);
   const [seed, setSeed] = useState(initialSeed);
   const [state, setState] = useState(() => createBattleState(lebronJames, opponent, mode, seed));
+  const [phase, setPhase] = useState<"select" | "battle">(initialOpponentId ? "battle" : "select");
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [shareState, setShareState] = useState("复制链接");
@@ -452,6 +484,7 @@ export default function App() {
   const startBattle = () => {
     const fresh = createBattleState(lebronJames, opponent, mode, seed);
     setState(mode === "auto" ? resolveAutoBattle(fresh) : fresh);
+    setPhase("battle");
   };
 
   const resolveManual = (metricId: string) => {
@@ -467,9 +500,15 @@ export default function App() {
   const pickOpponent = (player: PlayerCard) => {
     setOpponent(player);
     setSeed(createShareSeed());
+    setPhase("select");
   };
 
   const restart = () => {
+    setState(createBattleState(lebronJames, opponent, mode, seed));
+  };
+
+  const backToSelect = () => {
+    setPhase("select");
     setState(createBattleState(lebronJames, opponent, mode, seed));
   };
 
@@ -490,6 +529,49 @@ export default function App() {
       ? "自动模式会一键打完全场"
       : "手动模式每回合由你选数据项";
 
+  if (phase === "select") {
+    return (
+      <main className="app-shell">
+        <header className="app-header">
+          <div>
+            <span className="eyebrow">Open-source card battle</span>
+            <h1>詹姆斯 VS 凯尔特人</h1>
+            <p>先选凯尔特人球星卡。点击开战后，才进入对战界面并滚动播放两人的全部数据对比。</p>
+          </div>
+          <div className="header-actions">
+            <button className="ghost-button" type="button" onClick={() => setSourcesOpen(true)}>
+              <BadgeInfo size={18} />
+              来源
+            </button>
+            <button className="ghost-button" type="button" onClick={copyShare}>
+              <Clipboard size={18} />
+              {shareState}
+            </button>
+          </div>
+        </header>
+
+        <SelectionIntro selected={opponent} />
+
+        <section className="selection-controls">
+          <ModeSwitch mode={mode} onChange={setMode} />
+          <button className="primary-button" type="button" onClick={startBattle}>
+            <Play size={18} />
+            开战
+          </button>
+        </section>
+
+        <OpponentPicker selected={opponent} onPick={pickOpponent} onSeedPick={chooseSeededOpponent} />
+
+        <footer className="app-footer">
+          <span>非官方球迷作品，不使用官方 Logo 或球员照片。</span>
+          <span>数据快照：{dataSnapshotDate}</span>
+        </footer>
+
+        <SourcesModal open={sourcesOpen} onClose={() => setSourcesOpen(false)} />
+      </main>
+    );
+  }
+
   return (
     <main className="app-shell">
       <header className="app-header">
@@ -506,6 +588,10 @@ export default function App() {
           <button className="ghost-button" type="button" onClick={copyShare}>
             <Clipboard size={18} />
             {shareState}
+          </button>
+          <button className="ghost-button" type="button" onClick={backToSelect}>
+            <RotateCcw size={18} />
+            重新选卡
           </button>
         </div>
       </header>
@@ -525,7 +611,7 @@ export default function App() {
         <div className="primary-actions">
           <button className="primary-button" type="button" onClick={startBattle}>
             <Play size={18} />
-            {mode === "auto" ? "自动开战" : state.round === 0 ? "开始手动战" : "重开本局"}
+            {mode === "auto" ? "重新自动开战" : state.round === 0 ? "开始手动战" : "重开本局"}
           </button>
           <button className="secondary-button" type="button" onClick={restart}>
             <RotateCcw size={18} />
@@ -539,9 +625,8 @@ export default function App() {
       </section>
 
       <section className="main-grid">
-        <OpponentPicker selected={opponent} onPick={pickOpponent} onSeedPick={chooseSeededOpponent} />
+        <DataComparisonBoard opponent={opponent} />
         <div className="battle-column">
-          <HonorComparisonBoard opponent={opponent} />
           {mode === "manual" && (
             <ManualControls metrics={manualMetrics} disabled={state.finished} onResolve={resolveManual} />
           )}
