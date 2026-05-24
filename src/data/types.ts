@@ -1,4 +1,4 @@
-export type TeamSide = "james" | "celtics";
+export type TeamSide = "james" | "legend" | "celtics";
 
 export type BattleMode = "manual" | "auto";
 
@@ -80,6 +80,7 @@ export interface RankSource {
 export interface PlayerCard {
   id: string;
   name: string;
+  aliases?: string[];
   teamSide: TeamSide;
   era: string;
   position: string;

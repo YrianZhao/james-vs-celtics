@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { celticsPlayers, lebronJames } from "../data/players";
+import { celticsPlayers, lebronJames, legendPlayers } from "../data/players";
 import { buildHonorComparison, honorScoreRules } from "./honorScore";
 
 describe("honorScore", () => {
@@ -17,5 +17,15 @@ describe("honorScore", () => {
 
     expect(row?.leader).toBe("opponent");
     expect(row?.opponentPoints).toBeGreaterThan(row?.jamesPoints ?? 0);
+  });
+
+  it("scores different historical archetypes with the same rule set", () => {
+    const jordan = legendPlayers.find((player) => player.name === "Michael Jordan")!;
+    const curry = legendPlayers.find((player) => player.name === "Stephen Curry")!;
+    const jokic = legendPlayers.find((player) => player.name === "Nikola Jokic")!;
+
+    expect(buildHonorComparison(lebronJames, jordan).opponentScore).toBeGreaterThan(0);
+    expect(buildHonorComparison(lebronJames, curry).opponentScore).toBeGreaterThan(0);
+    expect(buildHonorComparison(lebronJames, jokic).opponentScore).toBeGreaterThan(0);
   });
 });

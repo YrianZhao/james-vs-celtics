@@ -26,6 +26,8 @@ export interface HonorComparison {
   winner: "james" | "opponent" | "tie";
 }
 
+export type HonorComparisonSide = HonorComparison["winner"];
+
 export const honorScoreRules: HonorScoreRule[] = [
   { key: "championships", label: "NBA 总冠军", unit: "次", weight: 12 },
   { key: "mvps", label: "常规赛 MVP", unit: "次", weight: 14 },
@@ -42,21 +44,21 @@ export const honorScoreRules: HonorScoreRule[] = [
   { key: "nba75", label: "NBA 75 大", unit: "项", weight: 10 }
 ];
 
-export function buildHonorComparison(james: PlayerCard, opponent: PlayerCard): HonorComparison {
+export function buildHonorComparison(first: PlayerCard, second: PlayerCard): HonorComparison {
   const rows = honorScoreRules.map((rule) => {
-    const jamesValue = james.honors[rule.key];
-    const opponentValue = opponent.honors[rule.key];
-    const jamesPoints = jamesValue * rule.weight;
-    const opponentPoints = opponentValue * rule.weight;
+    const firstValue = first.honors[rule.key];
+    const secondValue = second.honors[rule.key];
+    const firstPoints = firstValue * rule.weight;
+    const secondPoints = secondValue * rule.weight;
     const leader: HonorScoreRow["leader"] =
-      jamesPoints > opponentPoints ? "james" : opponentPoints > jamesPoints ? "opponent" : "tie";
+      firstPoints > secondPoints ? "james" : secondPoints > firstPoints ? "opponent" : "tie";
 
     return {
       ...rule,
-      jamesValue,
-      opponentValue,
-      jamesPoints,
-      opponentPoints,
+      jamesValue: firstValue,
+      opponentValue: secondValue,
+      jamesPoints: firstPoints,
+      opponentPoints: secondPoints,
       leader
     };
   });

@@ -2,6 +2,8 @@ import { comparisonMetrics } from "../data/metrics";
 import type { BattleMode, ComparisonMetric, PlayerCard } from "../data/types";
 import { seededRandom } from "./random";
 
+export const MAX_BATTLE_ROUNDS = 4;
+
 export interface BattleRound {
   round: number;
   metric: ComparisonMetric;
@@ -24,6 +26,7 @@ export interface BattleState {
   opponentHp: number;
   log: BattleRound[];
   finished: boolean;
+  usedMetricIds: string[];
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -50,8 +53,23 @@ export function getAvailableMetrics(james: PlayerCard, opponent: PlayerCard) {
   });
 }
 
+export function getAvailableHonorMetrics(james: PlayerCard, opponent: PlayerCard, usedMetricIds: string[] = []) {
+  return getAvailableMetrics(james, opponent).filter(
+    (metric) => metric.kind === "honor" && !usedMetricIds.includes(metric.id)
+  );
+}
+
 function getDramaMultiplier(opponent: PlayerCard, metric: ComparisonMetric) {
-  const legendBoostIds = ["Bill Russell", "Larry Bird", "John Havlicek", "Paul Pierce", "Kevin Garnett"];
+  const legendBoostIds = [
+    "Michael Jordan",
+    "Kobe Bryant",
+    "Stephen Curry",
+    "Magic Johnson",
+    "Bill Russell",
+    "Larry Bird",
+    "Kareem Abdul-Jabbar",
+    "Kevin Garnett"
+  ];
   const legendBoost = legendBoostIds.includes(opponent.name) ? 1.18 : 1;
   const ringBoost = metric.id === "championships" && opponent.honors.championships >= 6 ? 1.25 : 1;
   const modernBoost = opponent.era.includes("至今") ? 1.08 : 1;
@@ -59,7 +77,7 @@ function getDramaMultiplier(opponent: PlayerCard, metric: ComparisonMetric) {
 }
 
 function chooseAutoMetric(james: PlayerCard, opponent: PlayerCard, round: number, seed: string) {
-  const available = getAvailableMetrics(james, opponent);
+  const available = getAvailableHonorMetrics(james, opponent);
   const scored = available.map((metric, index) => {
     const jamesValue = getValue(james, metric) ?? 0;
     const opponentValue = getValue(opponent, metric) ?? 0;
@@ -79,6 +97,31 @@ function chooseAutoMetric(james: PlayerCard, opponent: PlayerCard, round: number
   return topWindow[pickIndex]?.metric ?? scored[0].metric;
 }
 
+function chooseUnusedAutoMetric(state: BattleState, nextRound: number) {
+  const available = getAvailableHonorMetrics(state.james, state.opponent, state.usedMetricIds);
+
+  if (available.length === 0) {
+    return chooseAutoMetric(state.james, state.opponent, nextRound, state.seed);
+  }
+
+  const scored = available.map((metric, index) => {
+    const jamesValue = getValue(state.james, metric) ?? 0;
+    const opponentValue = getValue(state.opponent, metric) ?? 0;
+    const strongerValue = Math.max(jamesValue, opponentValue, 1);
+    const gap = Math.abs(jamesValue - opponentValue) / strongerValue;
+    const noise = seededRandom(state.seed, nextRound * 47 + index) * 3;
+    return {
+      metric,
+      score: metric.baseWeight * (0.75 + gap) + noise
+    };
+  });
+
+  scored.sort((a, b) => b.score - a.score);
+  const windowSize = Math.min(4, scored.length);
+  const pickIndex = Math.floor(seededRandom(state.seed, nextRound * 19) * windowSize);
+  return scored[pickIndex]?.metric ?? scored[0]?.metric ?? chooseAutoMetric(state.james, state.opponent, nextRound, state.seed);
+}
+
 function makeLine(opponent: PlayerCard, winner: "james" | "opponent", metric: ComparisonMetric) {
   if (winner === "james") {
     const jamesLines = [
@@ -91,7 +134,7 @@ function makeLine(opponent: PlayerCard, winner: "james" | "opponent", metric: Co
 
   return (
     opponent.trashTalkLines[Math.floor(Math.random() * opponent.trashTalkLines.length)] ??
-    `${opponent.name} 用「${metric.label}」打出反击，绿军老账本开始发光。`
+    `${opponent.name} 用「${metric.label}」打出反击，历史老账本开始发光。`
   );
 }
 
@@ -104,15 +147,20 @@ export function resolveRound(
   }
 
   const nextRound = state.round + 1;
+  const selectedMetric = comparisonMetrics.find((item) => item.id === selectedMetricId);
   const metric =
-    comparisonMetrics.find((item) => item.id === selectedMetricId) ??
-    chooseAutoMetric(state.james, state.opponent, nextRound, state.seed);
+    selectedMetric?.kind === "honor" && !state.usedMetricIds.includes(selectedMetric.id)
+      ? selectedMetric
+      : chooseUnusedAutoMetric(state, nextRound);
 
   const jamesValue = getValue(state.james, metric);
   const opponentValue = getValue(state.opponent, metric);
 
   if (typeof jamesValue !== "number" || typeof opponentValue !== "number") {
-    const fallback = chooseAutoMetric(state.james, state.opponent, nextRound, state.seed);
+    const fallback = chooseUnusedAutoMetric(state, nextRound);
+    if (fallback.id === metric.id) {
+      return { ...state, finished: true };
+    }
     return resolveRound(state, fallback.id);
   }
 
@@ -144,7 +192,8 @@ export function resolveRound(
     jamesHp,
     opponentHp,
     log: [battleRound, ...state.log],
-    finished: jamesHp <= 0 || opponentHp <= 0
+    usedMetricIds: [...state.usedMetricIds, metric.id],
+    finished: jamesHp <= 0 || opponentHp <= 0 || nextRound >= MAX_BATTLE_ROUNDS
   };
 }
 
@@ -163,11 +212,12 @@ export function createBattleState(
     jamesHp: 100,
     opponentHp: 100,
     log: [],
-    finished: false
+    finished: false,
+    usedMetricIds: []
   };
 }
 
-export function resolveAutoBattle(initialState: BattleState, maxRounds = 24) {
+export function resolveAutoBattle(initialState: BattleState, maxRounds = MAX_BATTLE_ROUNDS) {
   let state = initialState;
 
   while (!state.finished && state.round < maxRounds) {

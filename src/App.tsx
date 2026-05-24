@@ -7,30 +7,38 @@ import {
   Bot,
   ChevronDown,
   Clipboard,
+  Cpu,
   Crown,
   Dumbbell,
   Play,
   RotateCcw,
+  Search,
   Swords,
   Trophy,
   UserRoundCheck,
   Zap
 } from "lucide-react";
+import {
+  findPlayerMatches,
+  getHonorAgentPlayers,
+  runHonorAgent,
+  type HonorAgentReport
+} from "./agent/honorAgent";
 import { getPlayerDisplayName } from "./data/displayNames";
 import { comparisonMetrics } from "./data/metrics";
-import { celticsPlayers, lebronJames } from "./data/players";
+import { lebronJames, opponentPlayers } from "./data/players";
 import { dataSnapshotDate, sourceCatalog } from "./data/sources";
 import type { BattleMode, ComparisonMetric, PlayerCard } from "./data/types";
 import { createShareSeed, pickBySeed } from "./game/random";
 import {
   type BattleState,
+  MAX_BATTLE_ROUNDS,
   createBattleState,
   formatValue,
-  getAvailableMetrics,
-  resolveAutoBattle,
+  getAvailableHonorMetrics,
   resolveRound
 } from "./game/resolveRound";
-import { buildFullComparison, type ComparisonScoreRow } from "./game/comparisonScore";
+import { buildHonorComparison, type HonorScoreRow } from "./game/honorScore";
 
 const params = new URLSearchParams(window.location.search);
 const initialOpponentId = params.get("opponent");
@@ -53,6 +61,29 @@ function getMetricValue(player: PlayerCard, metric: ComparisonMetric) {
   }
 
   return player.careerTotals[metric.key as keyof PlayerCard["careerTotals"]];
+}
+
+function getBattleWinner(state: BattleState) {
+  if (state.jamesHp > state.opponentHp) return "james";
+  if (state.opponentHp > state.jamesHp) return "opponent";
+
+  const jamesDamage = state.log
+    .filter((round) => round.winner === "james")
+    .reduce((total, round) => total + round.damage, 0);
+  const opponentDamage = state.log
+    .filter((round) => round.winner === "opponent")
+    .reduce((total, round) => total + round.damage, 0);
+
+  if (jamesDamage > opponentDamage) return "james";
+  if (opponentDamage > jamesDamage) return "opponent";
+  return "tie";
+}
+
+function vibrateOnHit() {
+  const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (!prefersReducedMotion && "vibrate" in navigator) {
+    navigator.vibrate?.(45);
+  }
 }
 
 function PlayerPanel({
@@ -82,7 +113,7 @@ function PlayerPanel({
         <span className="player-silhouette" />
       </div>
       <div className="fighter-topline">
-        <span className="side-label">{side === "james" ? "你的阵营" : "凯尔特人对手"}</span>
+        <span className="side-label">{side === "james" ? "你的阵营" : "历史球星对手"}</span>
         <span className="era-badge">{player.era}</span>
       </div>
       <div className="fighter-name-row">
@@ -150,14 +181,14 @@ function OpponentPicker({
       <div className="section-title">
         <div>
           <span>卡池选择</span>
-          <h3>挑一张绿军对手卡</h3>
+          <h3>挑一张历史球星对手卡</h3>
         </div>
         <button className="icon-button" onClick={onSeedPick} type="button" aria-label="按种子抽一张">
           <RotateCcw size={18} />
         </button>
       </div>
-      <div className="card-grid" aria-label="凯尔特人球星卡池">
-        {celticsPlayers.map((player) => (
+      <div className="card-grid" aria-label="历史球星卡池">
+        {opponentPlayers.map((player) => (
           <button
             className={`opponent-card ${selected.id === player.id ? "selected" : ""}`}
             key={player.id}
@@ -189,7 +220,7 @@ function ManualControls({
       <div className="section-title compact">
         <div>
           <span>手动模式</span>
-          <h3>选择这一回合的对比项</h3>
+          <h3>选择这一回合的隐藏荣誉项</h3>
         </div>
         <Dumbbell size={20} />
       </div>
@@ -221,6 +252,7 @@ function BattleLog({ state }: { state: BattleState }) {
       {latest ? (
         <article className={`latest-round ${latest.winner}`}>
           <div className="round-header">
+            <em>R{latest.round}/{MAX_BATTLE_ROUNDS}</em>
             <span>{latest.metric.sourceLabel}</span>
             <strong>{latest.metric.label}</strong>
           </div>
@@ -244,7 +276,7 @@ function BattleLog({ state }: { state: BattleState }) {
       ) : (
         <div className="empty-log">
           <Swords size={28} />
-          <p>选择对手和模式后开战。自动模式会自己打完全场，手动模式由你挑每回合的数据项。</p>
+          <p>倒计时结束后开打。自动模式会连续打满 4 回合，手动模式由你挑每回合的隐藏荣誉项。</p>
         </div>
       )}
       <div className="round-list">
@@ -260,11 +292,11 @@ function BattleLog({ state }: { state: BattleState }) {
   );
 }
 
-function DataTickerRow({
+function HonorTickerRow({
   row,
   opponentName
 }: {
-  row: ComparisonScoreRow;
+  row: HonorScoreRow;
   opponentName: string;
 }) {
   const leaderText =
@@ -274,35 +306,37 @@ function DataTickerRow({
     <div className={`honor-ticker-row ${row.leader}`}>
       <span>{row.label}</span>
       <strong>
-        詹姆斯 {formatValue(row.jamesValue)}
+        詹姆斯 {row.jamesValue}
+        {row.unit}
       </strong>
       <em>
-        {opponentName} {formatValue(row.opponentValue)}
+        {opponentName} {row.opponentValue}
+        {row.unit}
       </em>
       <b>{leaderText}</b>
     </div>
   );
 }
 
-function DataComparisonBoard({ opponent }: { opponent: PlayerCard }) {
+function HonorComparisonBoard({ opponent }: { opponent: PlayerCard }) {
   const opponentName = getPlayerDisplayName(opponent);
-  const comparison = useMemo(() => buildFullComparison(lebronJames, opponent), [opponent]);
+  const comparison = useMemo(() => buildHonorComparison(lebronJames, opponent), [opponent]);
   const visibleRows = comparison.rows.filter((row) => row.jamesValue > 0 || row.opponentValue > 0);
   const tickerRows = [...visibleRows, ...visibleRows];
   const maxScore = Math.max(comparison.jamesScore, comparison.opponentScore, 1);
   const winnerText =
     comparison.winner === "james"
-      ? "综合总分：詹姆斯压住这一局"
+      ? "荣誉总分：詹姆斯压住这一局"
       : comparison.winner === "opponent"
-        ? `综合总分：${opponentName} 顶住门面`
-        : "综合总分：双方平手";
+        ? `荣誉总分：${opponentName} 顶住挑战`
+        : "荣誉总分：双方平手";
 
   return (
     <section className="honor-board">
       <div className="section-title">
         <div>
-          <span>全部数据对比</span>
-          <h3>{opponentName} vs 詹姆斯滚动数据榜</h3>
+          <span>荣誉值对比</span>
+          <h3>{opponentName} vs 詹姆斯荣誉榜</h3>
         </div>
         <Crown size={22} />
       </div>
@@ -316,7 +350,7 @@ function DataComparisonBoard({ opponent }: { opponent: PlayerCard }) {
         </div>
         <div className="score-verdict">
           <b>{winnerText}</b>
-          <small>总分综合荣誉、生涯数据、场均、季后赛和历史评价</small>
+          <small>只计算冠军、MVP、FMVP、最佳阵容等结构化荣誉</small>
         </div>
         <div className="score-side opponent-score">
           <span>{opponentName}</span>
@@ -326,14 +360,143 @@ function DataComparisonBoard({ opponent }: { opponent: PlayerCard }) {
           </div>
         </div>
       </div>
-      <div className="honor-ticker" aria-label="全部数据滚动播放">
+      <div className="honor-ticker" aria-label="荣誉数据滚动播放">
         <div className="honor-ticker-track">
           {tickerRows.map((row, index) => (
-            <DataTickerRow key={`${row.id}-${index}`} row={row} opponentName={opponentName} />
+            <HonorTickerRow key={`${row.key}-${index}`} row={row} opponentName={opponentName} />
           ))}
         </div>
       </div>
     </section>
+  );
+}
+
+function HonorAgentPanel() {
+  const [firstInput, setFirstInput] = useState("LeBron James");
+  const [secondInput, setSecondInput] = useState("Michael Jordan");
+  const [result, setResult] = useState(() => runHonorAgent("LeBron James", "Michael Jordan"));
+  const players = getHonorAgentPlayers();
+  const report = result.report;
+
+  const runAgent = () => {
+    setResult(runHonorAgent(firstInput, secondInput));
+  };
+
+  const suggestions = useMemo(() => {
+    const picked = [
+      ...findPlayerMatches(firstInput).map((match) => match.player),
+      ...findPlayerMatches(secondInput).map((match) => match.player),
+      ...players.slice(0, 6)
+    ];
+    return picked.filter((player, index) => picked.findIndex((item) => item.id === player.id) === index).slice(0, 8);
+  }, [firstInput, secondInput, players]);
+
+  return (
+    <section className="agent-panel">
+      <div className="section-title">
+        <div>
+          <span>Honor Agent</span>
+          <h3>输入两个球星，生成荣誉值报告</h3>
+        </div>
+        <Cpu size={22} />
+      </div>
+
+      <div className="agent-form">
+        <label>
+          <span>球星 A</span>
+          <input value={firstInput} onChange={(event) => setFirstInput(event.target.value)} list="agent-player-list" />
+        </label>
+        <label>
+          <span>球星 B</span>
+          <input value={secondInput} onChange={(event) => setSecondInput(event.target.value)} list="agent-player-list" />
+        </label>
+        <button className="primary-button" type="button" onClick={runAgent}>
+          <Search size={18} />
+          生成报告
+        </button>
+        <datalist id="agent-player-list">
+          {players.map((player) => (
+            <option key={player.id} value={getPlayerDisplayName(player)} />
+          ))}
+        </datalist>
+      </div>
+
+      <div className="agent-suggestion-row">
+        {suggestions.map((player) => (
+          <button
+            key={player.id}
+            type="button"
+            onClick={() => setSecondInput(getPlayerDisplayName(player))}
+            className="agent-chip"
+          >
+            {getPlayerDisplayName(player)}
+          </button>
+        ))}
+      </div>
+
+      {report ? <HonorAgentReportView report={report} /> : <HonorAgentFailureView failures={result.failures} />}
+    </section>
+  );
+}
+
+function HonorAgentReportView({ report }: { report: HonorAgentReport }) {
+  const firstName = getPlayerDisplayName(report.first);
+  const secondName = getPlayerDisplayName(report.second);
+
+  return (
+    <article className="agent-report">
+      <div className="agent-verdict">
+        <span>本地 agent 分析</span>
+        <strong>{report.winnerLabel}</strong>
+        <p>{report.summary}</p>
+      </div>
+      <div className="agent-score-pair">
+        <span>
+          {firstName}
+          <strong>{report.comparison.jamesScore}</strong>
+        </span>
+        <em>荣誉值</em>
+        <span>
+          {secondName}
+          <strong>{report.comparison.opponentScore}</strong>
+        </span>
+      </div>
+      <div className="agent-debate-list">
+        {report.debatePoints.map((point) => (
+          <p key={point}>{point}</p>
+        ))}
+      </div>
+      <div className="agent-mini-table">
+        {report.decisiveRows.map((row) => (
+          <div key={row.key} className={`agent-mini-row ${row.leader}`}>
+            <span>{row.label}</span>
+            <strong>
+              {row.jamesValue}
+              {row.unit}
+            </strong>
+            <em>
+              {row.opponentValue}
+              {row.unit}
+            </em>
+          </div>
+        ))}
+      </div>
+    </article>
+  );
+}
+
+function HonorAgentFailureView({ failures }: { failures: { input: string; suggestions: PlayerCard[] }[] }) {
+  return (
+    <div className="agent-empty">
+      <Search size={24} />
+      <p>没有稳定匹配到球员。试试中文名、英文名或常见绰号。</p>
+      {failures.map((failure) => (
+        <div key={failure.input}>
+          <strong>{failure.input || "空输入"}</strong>
+          <span>{failure.suggestions.map((player) => getPlayerDisplayName(player)).join(" / ") || "暂无候选"}</span>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -353,18 +516,13 @@ function ResultModal({
   onSelect: () => void;
 }) {
   const opponentName = getPlayerDisplayName(opponent);
-  const comparison = useMemo(() => buildFullComparison(lebronJames, opponent), [opponent]);
-  const winner =
-    state.finished && state.jamesHp !== state.opponentHp
-      ? state.jamesHp > state.opponentHp
-        ? "james"
-        : "opponent"
-      : comparison.winner;
+  const comparison = useMemo(() => buildHonorComparison(lebronJames, opponent), [opponent]);
+  const winner = state.finished ? getBattleWinner(state) : comparison.winner;
   const winnerName = winner === "james" ? "勒布朗·詹姆斯" : winner === "opponent" ? opponentName : "双方平手";
   const subtitle =
     winner === "tie"
-      ? "综合数据打到难分高下，这局算是吵架素材拉满。"
-      : `${winnerName} 赢了。下面是完整数据对比，输赢理由直接摊开。`;
+      ? "四个荣誉回合打到难分高下，这局算是吵架素材拉满。"
+      : `${winnerName} 赢了。下面是完整荣誉值对比，输赢理由直接摊开。`;
 
   if (!open) {
     return null;
@@ -382,7 +540,7 @@ function ResultModal({
               勒布朗·詹姆斯
               <strong>{comparison.jamesScore}</strong>
             </span>
-            <em>综合分</em>
+            <em>荣誉值</em>
             <span>
               {opponentName}
               <strong>{comparison.opponentScore}</strong>
@@ -392,20 +550,22 @@ function ResultModal({
 
         <div className="result-table-wrap">
           <div className="result-table-head">
-            <span>项目</span>
+            <span>荣誉项</span>
             <strong>詹姆斯</strong>
             <em>{opponentName}</em>
             <b>领先方</b>
           </div>
           <div className="result-table">
             {comparison.rows.map((row) => (
-              <div className={`result-row ${row.leader}`} key={row.id}>
+              <div className={`result-row ${row.leader}`} key={row.key}>
                 <span>
-                  <small>{row.sourceLabel}</small>
+                  <small>
+                    权重 {row.weight} / {row.unit}
+                  </small>
                   {row.label}
                 </span>
-                <strong>{formatValue(row.jamesValue)}</strong>
-                <em>{formatValue(row.opponentValue)}</em>
+                <strong>{row.jamesValue}</strong>
+                <em>{row.opponentValue}</em>
                 <b>
                   {row.leader === "james" ? "詹姆斯" : row.leader === "opponent" ? opponentName : "平手"}
                 </b>
@@ -501,7 +661,7 @@ function SourcesModal({ open, onClose }: { open: boolean; onClose: () => void })
           </button>
         </div>
         <p>
-          本游戏使用公开资料中常见的核心荣誉与生涯总计做可玩化快照。低位卡不追求逐小数精确，重点是让手机和电脑都能打开就玩。
+          本游戏使用公开资料中常见的核心荣誉做可玩化快照。精选历史球星池为静态资料，不代表实时自动更新。
         </p>
         <div className="source-list">
           {sourceCatalog.map((source) => (
@@ -530,7 +690,7 @@ function SelectionIntro({ selected }: { selected: PlayerCard }) {
       <div className="selection-hero-card">
         <span className="eyebrow">你的固定阵营</span>
         <h2>勒布朗·詹姆斯</h2>
-        <p>先选一张凯尔特人球星卡，点击开战后进入完整对战界面，系统会滚动播放两人的全部数据对比。</p>
+        <p>先选一张历史球星卡，点击开战后进入 3-2-1 倒计时和 4 回合荣誉对战。</p>
         <div className="selection-stat-row">
           <span>
             <strong>{lebronJames.honors.championships}</strong>
@@ -558,37 +718,88 @@ function SelectionIntro({ selected }: { selected: PlayerCard }) {
 }
 
 export default function App() {
-  const seededOpponent = useMemo(() => pickBySeed(celticsPlayers, initialSeed), []);
+  const seededOpponent = useMemo(() => pickBySeed(opponentPlayers, initialSeed), []);
   const [opponent, setOpponent] = useState(
-    celticsPlayers.find((player) => player.id === initialOpponentId) ?? seededOpponent
+    opponentPlayers.find((player) => player.id === initialOpponentId) ?? seededOpponent
   );
   const [mode, setMode] = useState<BattleMode>(initialMode);
   const [seed, setSeed] = useState(initialSeed);
   const [state, setState] = useState(() => createBattleState(lebronJames, opponent, mode, seed));
-  const [phase, setPhase] = useState<"select" | "battle">(initialOpponentId ? "battle" : "select");
+  const [phase, setPhase] = useState<"select" | "countdown" | "battle">(initialOpponentId ? "battle" : "select");
+  const [countdown, setCountdown] = useState(3);
+  const [autoPlaying, setAutoPlaying] = useState(false);
+  const [impactSide, setImpactSide] = useState<"james" | "opponent" | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [resultOpen, setResultOpen] = useState(false);
   const [shareState, setShareState] = useState("复制链接");
 
-  const manualMetrics = useMemo(() => getAvailableMetrics(lebronJames, opponent), [opponent]);
+  const manualMetrics = useMemo(
+    () => getAvailableHonorMetrics(lebronJames, opponent, state.usedMetricIds),
+    [opponent, state.usedMetricIds]
+  );
 
   useEffect(() => {
     setState(createBattleState(lebronJames, opponent, mode, seed));
     setResultOpen(false);
+    setAutoPlaying(false);
+    setImpactSide(null);
   }, [opponent, mode, seed]);
 
   const startBattle = () => {
     const fresh = createBattleState(lebronJames, opponent, mode, seed);
-    const nextState = mode === "auto" ? resolveAutoBattle(fresh) : fresh;
-    setState(nextState);
-    setPhase("battle");
-    setResultOpen(mode === "auto");
+    setState(fresh);
+    setResultOpen(false);
+    setAutoPlaying(false);
+    setImpactSide(null);
+    setCountdown(3);
+    setPhase("countdown");
   };
+
+  useEffect(() => {
+    if (phase !== "countdown") return undefined;
+
+    if (countdown <= 0) {
+      setPhase("battle");
+      setAutoPlaying(mode === "auto");
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => setCountdown((value) => value - 1), 800);
+    return () => window.clearTimeout(timer);
+  }, [countdown, mode, phase]);
+
+  useEffect(() => {
+    if (!autoPlaying || mode !== "auto" || phase !== "battle") return undefined;
+
+    if (state.finished) {
+      setAutoPlaying(false);
+      setResultOpen(true);
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      setState((current) => {
+        if (current.finished) return current;
+        const nextState = resolveRound(current);
+        const latest = nextState.log[0];
+        setImpactSide(latest?.winner === "james" ? "opponent" : "james");
+        vibrateOnHit();
+        window.setTimeout(() => setImpactSide(null), 420);
+        return nextState;
+      });
+    }, state.round === 0 ? 450 : 1050);
+
+    return () => window.clearTimeout(timer);
+  }, [autoPlaying, mode, phase, state.finished, state.round]);
 
   const resolveManual = (metricId: string) => {
     setState((current) => {
       const nextState = resolveRound(current, metricId);
+      const latest = nextState.log[0];
+      setImpactSide(latest?.winner === "james" ? "opponent" : "james");
+      vibrateOnHit();
+      window.setTimeout(() => setImpactSide(null), 420);
       if (nextState.finished) {
         setResultOpen(true);
       }
@@ -599,7 +810,7 @@ export default function App() {
   const chooseSeededOpponent = () => {
     const nextSeed = createShareSeed();
     setSeed(nextSeed);
-    setOpponent(pickBySeed(celticsPlayers, nextSeed));
+    setOpponent(pickBySeed(opponentPlayers, nextSeed));
   };
 
   const pickOpponent = (player: PlayerCard) => {
@@ -617,6 +828,8 @@ export default function App() {
     setPhase("select");
     setState(createBattleState(lebronJames, opponent, mode, seed));
     setResultOpen(false);
+    setAutoPlaying(false);
+    setImpactSide(null);
   };
 
   const copyShare = async () => {
@@ -629,12 +842,14 @@ export default function App() {
   const activeSide = state.log[0]?.winner === "opponent" ? "opponent" : "james";
   const opponentName = getPlayerDisplayName(opponent);
   const resultText = state.finished
-    ? state.jamesHp > state.opponentHp
+    ? getBattleWinner(state) === "james"
       ? "詹姆斯拿下这局"
-      : `${opponentName} 守住绿军门面`
+      : getBattleWinner(state) === "opponent"
+        ? `${opponentName} 赢下荣誉战`
+        : "四回合打平"
     : mode === "auto"
-      ? "自动模式会一键打完全场"
-      : "手动模式每回合由你选数据项";
+      ? `自动模式会连打 ${MAX_BATTLE_ROUNDS} 回合`
+      : "手动模式每回合由你选隐藏荣誉项";
 
   if (phase === "select") {
     return (
@@ -642,8 +857,8 @@ export default function App() {
         <header className="app-header">
           <div>
             <span className="eyebrow">Open-source card battle</span>
-            <h1>詹姆斯 VS 凯尔特人</h1>
-            <p>先选凯尔特人球星卡。点击开战后，才进入对战界面并滚动播放两人的全部数据对比。</p>
+            <h1>詹姆斯 VS 历史球星</h1>
+            <p>先选历史球星卡。点击开战后进入 3-2-1 倒计时，随后用 4 个隐藏荣誉项决胜。</p>
           </div>
           <div className="header-actions">
             <button className="ghost-button" type="button" onClick={() => setSourcesOpen(true)}>
@@ -658,6 +873,7 @@ export default function App() {
         </header>
 
         <SelectionIntro selected={opponent} />
+        <HonorAgentPanel />
 
         <section className="selection-controls">
           <ModeSwitch mode={mode} onChange={setMode} />
@@ -679,13 +895,28 @@ export default function App() {
     );
   }
 
+  if (phase === "countdown") {
+    return (
+      <main className="app-shell countdown-shell">
+        <section className="countdown-arena">
+          <div>
+            <span>准备对战</span>
+            <h1>詹姆斯 VS {opponentName}</h1>
+            <p>{mode === "auto" ? "自动模式将在倒计时后连续播放 4 回合。" : "手动模式将在倒计时后让你选择第一项隐藏荣誉。"}</p>
+          </div>
+          <strong>{countdown > 0 ? countdown : "开战"}</strong>
+        </section>
+      </main>
+    );
+  }
+
   return (
-    <main className="app-shell">
+    <main className={`app-shell ${impactSide ? "screen-shake" : ""}`}>
       <header className="app-header">
         <div>
           <span className="eyebrow">Open-source card battle</span>
-          <h1>詹姆斯 VS 凯尔特人</h1>
-          <p>手机上下分屏，电脑左右对战。你永远是詹姆斯，对面从绿军传奇卡池里挑。</p>
+          <h1>詹姆斯 VS 历史球星</h1>
+          <p>手机上下分屏，电脑斜向站位。你永远是詹姆斯，对面从历史球星荣誉池里挑。</p>
         </div>
         <div className="header-actions">
           <button className="ghost-button" type="button" onClick={() => setSourcesOpen(true)}>
@@ -703,14 +934,22 @@ export default function App() {
         </div>
       </header>
 
-      <section className="arena">
-        <PlayerPanel player={lebronJames} hp={state.jamesHp} side="james" active={activeSide === "james"} />
-        <div className="versus-core">
-          <span className="vs-token">VS</span>
+      <section className="battlefield">
+        <div className="court-markings" aria-hidden="true" />
+        <div className={`arena-fighter james ${activeSide === "james" ? "is-active" : ""} ${impactSide === "james" ? "is-hit" : ""}`}>
+          <PlayerPanel player={lebronJames} hp={state.jamesHp} side="james" active={activeSide === "james"} />
+        </div>
+        <div className={`arena-fighter opponent ${activeSide === "opponent" ? "is-active" : ""} ${impactSide === "opponent" ? "is-hit" : ""}`}>
+          <PlayerPanel player={opponent} hp={state.opponentHp} side="opponent" active={activeSide === "opponent"} />
+        </div>
+        <div className={`skill-burst ${state.log[0]?.winner ?? "idle"}`} aria-hidden="true">
+          <span>{state.log[0]?.metric.label ?? "荣誉开火"}</span>
+        </div>
+        <div className="versus-core battle-status">
+          <span className="vs-token">R{Math.min(state.round + (state.finished ? 0 : 1), MAX_BATTLE_ROUNDS)}</span>
           <strong>{resultText}</strong>
           <small>Seed {seed}</small>
         </div>
-        <PlayerPanel player={opponent} hp={state.opponentHp} side="opponent" active={activeSide === "opponent"} />
       </section>
 
       <section className="control-bar">
@@ -718,7 +957,7 @@ export default function App() {
         <div className="primary-actions">
           <button className="primary-button" type="button" onClick={startBattle}>
             <Play size={18} />
-            {mode === "auto" ? "重新自动开战" : state.round === 0 ? "开始手动战" : "重开本局"}
+            {mode === "auto" ? "重新自动开战" : state.round === 0 ? "重新倒计时" : "重开本局"}
           </button>
           <button className="secondary-button" type="button" onClick={restart}>
             <RotateCcw size={18} />
@@ -732,10 +971,10 @@ export default function App() {
       </section>
 
       <section className="main-grid">
-        <DataComparisonBoard opponent={opponent} />
+        <HonorComparisonBoard opponent={opponent} />
         <div className="battle-column">
           {mode === "manual" && (
-            <ManualControls metrics={manualMetrics} disabled={state.finished} onResolve={resolveManual} />
+            <ManualControls metrics={manualMetrics} disabled={state.finished || autoPlaying} onResolve={resolveManual} />
           )}
           <BattleLog state={state} />
         </div>

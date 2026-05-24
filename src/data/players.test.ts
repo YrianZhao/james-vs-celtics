@@ -1,11 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { celticsPlayers, lebronJames } from "./players";
+import { celticsPlayers, lebronJames, legendPlayers, opponentPlayers } from "./players";
 
 const totalKeys = ["games", "points", "rebounds", "assists", "steals", "blocks", "ppg", "rpg", "apg"] as const;
 
 describe("player data", () => {
   it("contains exactly 50 Celtics opponents", () => {
     expect(celticsPlayers).toHaveLength(50);
+  });
+
+  it("contains the 19-player historical opponent pool", () => {
+    expect(legendPlayers).toHaveLength(19);
+    expect(opponentPlayers).toBe(legendPlayers);
+    expect(legendPlayers.map((player) => player.name)).toEqual(
+      expect.arrayContaining(["Michael Jordan", "Stephen Curry", "Nikola Jokic", "Kevin Garnett"])
+    );
+    expect(legendPlayers.every((player) => player.teamSide === "legend")).toBe(true);
   });
 
   it("keeps each Celtics card complete enough for the game", () => {

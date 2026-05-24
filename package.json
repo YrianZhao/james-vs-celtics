@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "A responsive open-source browser card battle game: LeBron James vs. Boston legends.",
+  "description": "A responsive open-source browser honor battle game: LeBron James vs. historical NBA legends.",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "tsc -b && vite build",

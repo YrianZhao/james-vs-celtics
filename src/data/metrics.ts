@@ -147,12 +147,12 @@ export const comparisonMetrics: ComparisonMetric[] = [
   },
   {
     id: "celticsAura",
-    label: "绿军祖传气场",
+    label: "队史时代气场",
     kind: "legacy",
     key: "celticsAura",
     higherIsBetter: true,
     baseWeight: 7,
-    sourceLabel: "队史影响"
+    sourceLabel: "历史影响"
   },
   {
     id: "clutch",

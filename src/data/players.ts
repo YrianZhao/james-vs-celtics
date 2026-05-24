@@ -4,8 +4,11 @@ const lineupTop50Url =
   "https://www.lineups.com/articles/top-50-greatest-boston-celtics-players/";
 const basketballReferenceCelticsUrl =
   "https://www.basketball-reference.com/teams/BOS/";
+const nba75Url = "https://www.nba.com/news/nba-75th-anniversary-team-announced";
+const basketballReferenceAwardsUrl = "https://www.basketball-reference.com/awards/";
 const hallOfFameUrl = "https://www.hoophall.com/";
 const espnNbaUrl = "https://www.espn.com/nba/";
+const basketballReferenceBaseUrl = "https://www.basketball-reference.com/players/";
 
 const zeroHonors: Honors = {
   championships: 0,
@@ -41,6 +44,10 @@ function slug(name: string) {
   return name.toLowerCase().replace(/[.']/g, "").replace(/\s+/g, "-");
 }
 
+function basketballReferencePlayerUrl(path: string) {
+  return `${basketballReferenceBaseUrl}${path}`;
+}
+
 function celtic(
   rank: number,
   name: string,
@@ -74,9 +81,52 @@ function celtic(
   };
 }
 
+interface LegendOptions {
+  aliases?: string[];
+  sourcePath: string;
+  rank: number;
+}
+
+function legend(
+  options: LegendOptions,
+  name: string,
+  era: string,
+  position: string,
+  summaryTags: string[],
+  playerHonors: Honors,
+  careerTotals: CareerTotals,
+  advanced: PlayerCard["advanced"],
+  mediaNotes: string[],
+  trashTalkLines: string[]
+): PlayerCard {
+  const playerUrl = basketballReferencePlayerUrl(options.sourcePath);
+
+  return {
+    id: `legend-${slug(name)}`,
+    name,
+    aliases: options.aliases,
+    teamSide: "legend",
+    era,
+    position,
+    rankSource: {
+      rank: options.rank,
+      label: "精选历史球星荣誉池",
+      url: nba75Url
+    },
+    summaryTags,
+    honors: playerHonors,
+    careerTotals,
+    advanced,
+    mediaNotes,
+    sourceUrls: [nba75Url, basketballReferenceAwardsUrl, playerUrl, hallOfFameUrl, espnNbaUrl],
+    trashTalkLines
+  };
+}
+
 export const lebronJames: PlayerCard = {
   id: "lebron-james",
   name: "LeBron James",
+  aliases: ["勒布朗", "詹姆斯", "老詹", "小皇帝", "国王", "King James"],
   teamSide: "james",
   era: "2003-至今",
   position: "SF / PF / PG",
@@ -297,4 +347,237 @@ export const celticsPlayers: PlayerCard[] = [
   celtic(50, "Gerald Henderson", "1979-1992", "PG / SG", ["冠军后卫", "关键抢断", "老派控卫"], honors({ championships: 3 }), totals({ games: 871, points: 7521, rebounds: 1646, assists: 3415, steals: 912, blocks: 96, ppg: 8.9, rpg: 1.9, apg: 4.0 }), { dangerLevel: 65, clutch: 76, legacy: 66, celticsAura: 74 }, ["1984 总决赛关键抢断常被绿军球迷提起。"], ["亨德森的抢断不多解释，直接偷走一回合。"])
 ];
 
-export const allPlayers = [lebronJames, ...celticsPlayers];
+export const legendPlayers: PlayerCard[] = [
+  legend(
+    { rank: 1, sourcePath: "j/jordami01.html", aliases: ["乔丹", "MJ", "飞人", "篮球之神"] },
+    "Michael Jordan",
+    "1984-2003",
+    "SG",
+    ["6冠6FMVP", "5x MVP", "得分王机器"],
+    honors({ championships: 6, mvps: 5, finalsMvps: 6, allStars: 14, allNba: 11, allDefense: 9, scoringTitles: 10, dpoy: 1, roy: 1, hallOfFame: 1, nba75: 1 }),
+    totals({ games: 1072, points: 32292, rebounds: 6672, assists: 5633, steals: 2514, blocks: 893, ppg: 30.1, rpg: 6.2, apg: 5.3, playoffPoints: 5987, playoffRebounds: 1152, playoffAssists: 1022 }),
+    { dangerLevel: 100, clutch: 100, legacy: 100, celticsAura: 22 },
+    ["总决赛 6 次夺冠且 6 次 FMVP，是 GOAT 争论里最常被引用的硬荣誉。"],
+    ["乔丹把六枚戒指排成一排，连倒计时都想暂停。", "这一回合空气里全是最后一投的味道。"]
+  ),
+  legend(
+    { rank: 2, sourcePath: "b/bryanko01.html", aliases: ["科比", "黑曼巴", "Kobe", "Mamba"] },
+    "Kobe Bryant",
+    "1996-2016",
+    "SG",
+    ["5冠", "曼巴精神", "81分先生"],
+    honors({ championships: 5, mvps: 1, finalsMvps: 2, allStars: 18, allNba: 15, allDefense: 12, scoringTitles: 2, hallOfFame: 1, nba75: 1 }),
+    totals({ games: 1346, points: 33643, rebounds: 7047, assists: 6306, steals: 1944, blocks: 640, ppg: 25.0, rpg: 5.2, apg: 4.7, playoffPoints: 5640, playoffRebounds: 1119, playoffAssists: 1040 }),
+    { dangerLevel: 98, clutch: 98, legacy: 97, celticsAura: 40 },
+    ["个人荣誉、长期一阵和防守阵容数量都很厚，球迷讨论热度极高。"],
+    ["黑曼巴出手前不会解释，血条自己会懂。", "科比这一击像凌晨四点的投篮机。"]
+  ),
+  legend(
+    { rank: 3, sourcePath: "c/curryst01.html", aliases: ["库里", "萌神", "Stephen Curry", "Curry", "三分王"] },
+    "Stephen Curry",
+    "2009-至今",
+    "PG",
+    ["4冠", "2x MVP", "三分革命"],
+    honors({ championships: 4, mvps: 2, finalsMvps: 1, allStars: 11, allNba: 11, scoringTitles: 2, nba75: 1 }),
+    totals({ games: 1026, points: 25744, rebounds: 4831, assists: 6540, steals: 1544, blocks: 255, ppg: 25.1, rpg: 4.7, apg: 6.4, playoffPoints: 3966, playoffRebounds: 718, playoffAssists: 912 }),
+    { dangerLevel: 97, clutch: 95, legacy: 96, celticsAura: 28 },
+    ["三分时代的代表人物，MVP 和冠军履历让跨时代比较很有争议度。"],
+    ["库里刚过半场，荣誉栏已经开始拉开空间。", "这一击带着三分弧线，落点却是血条。"]
+  ),
+  legend(
+    { rank: 4, sourcePath: "j/johnsma02.html", aliases: ["魔术师", "Magic", "约翰逊"] },
+    "Magic Johnson",
+    "1979-1996",
+    "PG",
+    ["5冠", "3x MVP", "控卫天花板"],
+    honors({ championships: 5, mvps: 3, finalsMvps: 3, allStars: 12, allNba: 10, assistTitles: 4, hallOfFame: 1, nba75: 1 }),
+    totals({ games: 906, points: 17707, rebounds: 6559, assists: 10141, steals: 1724, blocks: 374, ppg: 19.5, rpg: 7.2, apg: 11.2, playoffPoints: 3701, playoffRebounds: 1465, playoffAssists: 2346 }),
+    { dangerLevel: 97, clutch: 97, legacy: 99, celticsAura: 68 },
+    ["冠军、MVP、FMVP 组合非常完整，是控卫历史地位讨论的核心样本。"],
+    ["魔术师把传球路线一画，对手的防守像被拆线。", "这一张 Showtime，连荣誉值都跑快攻。"]
+  ),
+  legend(
+    { rank: 5, sourcePath: "b/birdla01.html", aliases: ["伯德", "大鸟", "Larry Bird"] },
+    "Larry Bird",
+    "1979-1992",
+    "SF / PF",
+    ["3连MVP", "3冠", "冷血射手"],
+    honors({ championships: 3, mvps: 3, finalsMvps: 2, allStars: 12, allNba: 10, allDefense: 3, roy: 1, hallOfFame: 1, nba75: 1 }),
+    totals({ games: 897, points: 21791, rebounds: 8974, assists: 5695, steals: 1556, blocks: 755, ppg: 24.3, rpg: 10.0, apg: 6.3, playoffPoints: 3897, playoffRebounds: 1683, playoffAssists: 1062 }),
+    { dangerLevel: 98, clutch: 98, legacy: 99, celticsAura: 98 },
+    ["连续三年 MVP 是历史级履历，也是跨时代荣誉对比里的高权重筹码。"],
+    ["伯德先把话说完，再让数据替他补刀。", "这不是垃圾话，是附带伤害的预告。"]
+  ),
+  legend(
+    { rank: 6, sourcePath: "r/russebi01.html", aliases: ["拉塞尔", "指环王", "Bill Russell"] },
+    "Bill Russell",
+    "1956-1969",
+    "C",
+    ["11冠王", "5x MVP", "防守王朝"],
+    honors({ championships: 11, mvps: 5, allStars: 12, allNba: 11, reboundTitles: 4, hallOfFame: 1, nba75: 1 }),
+    totals({ games: 963, points: 14522, rebounds: 21620, assists: 4100, steals: null, blocks: null, ppg: 15.1, rpg: 22.5, apg: 4.3, playoffPoints: 2673, playoffRebounds: 4104, playoffAssists: 770 }),
+    { dangerLevel: 100, clutch: 97, legacy: 100, celticsAura: 100 },
+    ["11 次总冠军让任何荣誉模型都必须认真处理他的冠军权重。"],
+    ["拉塞尔打开戒指盒，球场灯光都被反射扣血。", "这一回合不是单挑，是王朝压境。"]
+  ),
+  legend(
+    { rank: 7, sourcePath: "a/abdulka01.html", aliases: ["贾巴尔", "天勾", "Kareem"] },
+    "Kareem Abdul-Jabbar",
+    "1969-1989",
+    "C",
+    ["6冠", "6x MVP", "天勾"],
+    honors({ championships: 6, mvps: 6, finalsMvps: 2, allStars: 19, allNba: 15, allDefense: 11, scoringTitles: 2, reboundTitles: 1, roy: 1, hallOfFame: 1, nba75: 1 }),
+    totals({ games: 1560, points: 38387, rebounds: 17440, assists: 5660, steals: 1160, blocks: 3189, ppg: 24.6, rpg: 11.2, apg: 3.6, playoffPoints: 5762, playoffRebounds: 2481, playoffAssists: 767 }),
+    { dangerLevel: 99, clutch: 96, legacy: 100, celticsAura: 45 },
+    ["6 个 MVP 是常规赛最高荣誉的顶格筹码，生涯长度也极其惊人。"],
+    ["天勾抬手，荣誉模型只能仰头看。", "贾巴尔的履历不是一页，是一卷。"]
+  ),
+  legend(
+    { rank: 8, sourcePath: "c/chambwi01.html", aliases: ["张伯伦", "Wilt", "篮球皇帝"] },
+    "Wilt Chamberlain",
+    "1959-1973",
+    "C",
+    ["2冠", "4x MVP", "数据怪兽"],
+    honors({ championships: 2, mvps: 4, finalsMvps: 1, allStars: 13, allNba: 10, allDefense: 2, scoringTitles: 7, reboundTitles: 11, assistTitles: 1, hallOfFame: 1, nba75: 1 }),
+    totals({ games: 1045, points: 31419, rebounds: 23924, assists: 4643, steals: null, blocks: null, ppg: 30.1, rpg: 22.9, apg: 4.4, playoffPoints: 3607, playoffRebounds: 3913, playoffAssists: 673 }),
+    { dangerLevel: 99, clutch: 92, legacy: 98, celticsAura: 30 },
+    ["个人数据和单项王数量夸张，和冠军权重之间的争议非常适合 agent 分析。"],
+    ["张伯伦的数据一出现，记分牌先申请加宽。", "这一击像 100 分之夜的余震。"]
+  ),
+  legend(
+    { rank: 9, sourcePath: "o/onealsh01.html", aliases: ["奥尼尔", "鲨鱼", "Shaq"] },
+    "Shaquille O'Neal",
+    "1992-2011",
+    "C",
+    ["4冠", "3连FMVP", "禁区怪物"],
+    honors({ championships: 4, mvps: 1, finalsMvps: 3, allStars: 15, allNba: 14, allDefense: 3, scoringTitles: 2, roy: 1, hallOfFame: 1, nba75: 1 }),
+    totals({ games: 1207, points: 28596, rebounds: 13099, assists: 3026, steals: 739, blocks: 2732, ppg: 23.7, rpg: 10.9, apg: 2.5, playoffPoints: 5250, playoffRebounds: 2508, playoffAssists: 582 }),
+    { dangerLevel: 98, clutch: 94, legacy: 97, celticsAura: 36 },
+    ["三连 FMVP 让他的巅峰统治力在荣誉值里极其突出。"],
+    ["鲨鱼沉到低位，连 HP 条都开始后退。", "这不是技能动画，这是禁区施工。"]
+  ),
+  legend(
+    { rank: 10, sourcePath: "d/duncati01.html", aliases: ["邓肯", "石佛", "Tim Duncan"] },
+    "Tim Duncan",
+    "1997-2016",
+    "PF / C",
+    ["5冠", "2x MVP", "稳定王朝"],
+    honors({ championships: 5, mvps: 2, finalsMvps: 3, allStars: 15, allNba: 15, allDefense: 15, roy: 1, hallOfFame: 1, nba75: 1 }),
+    totals({ games: 1392, points: 26496, rebounds: 15091, assists: 4225, steals: 1025, blocks: 3020, ppg: 19.0, rpg: 10.8, apg: 3.0, playoffPoints: 5172, playoffRebounds: 2859, playoffAssists: 764 }),
+    { dangerLevel: 97, clutch: 96, legacy: 98, celticsAura: 34 },
+    ["冠军、FMVP、一阵和防守阵容数量都非常均衡，是荣誉模型里的稳定高分型球员。"],
+    ["邓肯没有表情，但伤害结算很有礼貌。", "石佛一动不动，分差自己动了。"]
+  ),
+  legend(
+    { rank: 11, sourcePath: "d/duranke01.html", aliases: ["杜兰特", "KD", "死神"] },
+    "Kevin Durant",
+    "2007-至今",
+    "SF / PF",
+    ["2冠2FMVP", "MVP", "得分机器"],
+    honors({ championships: 2, mvps: 1, finalsMvps: 2, allStars: 15, allNba: 11, scoringTitles: 4, roy: 1, nba75: 1 }),
+    totals({ games: 1128, points: 30571, rebounds: 7949, assists: 5069, steals: 1191, blocks: 1234, ppg: 27.1, rpg: 7.0, apg: 4.5, playoffPoints: 4985, playoffRebounds: 1240, playoffAssists: 747 }),
+    { dangerLevel: 96, clutch: 94, legacy: 94, celticsAura: 24 },
+    ["高场均得分与 2 个 FMVP 是核心卖点，队友与路径争议也常被讨论。"],
+    ["KD 的出手点太高，防守和争论都够不到。", "死神镰刀一挥，荣誉栏直接掉帧。"]
+  ),
+  legend(
+    { rank: 12, sourcePath: "o/olajuha01.html", aliases: ["奥拉朱旺", "大梦", "Hakeem"] },
+    "Hakeem Olajuwon",
+    "1984-2002",
+    "C",
+    ["2冠2FMVP", "MVP+DPOY", "梦幻脚步"],
+    honors({ championships: 2, mvps: 1, finalsMvps: 2, allStars: 12, allNba: 12, allDefense: 9, reboundTitles: 2, dpoy: 2, hallOfFame: 1, nba75: 1 }),
+    totals({ games: 1238, points: 26946, rebounds: 13748, assists: 3058, steals: 2162, blocks: 3830, ppg: 21.8, rpg: 11.1, apg: 2.5, playoffPoints: 3755, playoffRebounds: 1621, playoffAssists: 458 }),
+    { dangerLevel: 95, clutch: 95, legacy: 95, celticsAura: 20 },
+    ["1994 年同季 MVP、DPOY、FMVP 的履历很硬，攻防荣誉都完整。"],
+    ["大梦一转身，防守者和血条都迷路了。", "梦幻脚步不是脚步，是判定范围。"]
+  ),
+  legend(
+    { rank: 13, sourcePath: "r/roberos01.html", aliases: ["大O", "罗伯特森", "Oscar"] },
+    "Oscar Robertson",
+    "1960-1974",
+    "PG",
+    ["三双先驱", "MVP", "冠军控卫"],
+    honors({ championships: 1, mvps: 1, allStars: 12, allNba: 11, assistTitles: 6, roy: 1, hallOfFame: 1, nba75: 1 }),
+    totals({ games: 1040, points: 26710, rebounds: 7804, assists: 9887, steals: 77, blocks: 4, ppg: 25.7, rpg: 7.5, apg: 9.5, playoffPoints: 1910, playoffRebounds: 633, playoffAssists: 769 }),
+    { dangerLevel: 91, clutch: 90, legacy: 94, celticsAura: 25 },
+    ["三双和全能控卫叙事非常强，荣誉厚度主要集中在 MVP、全明星和最佳阵容。"],
+    ["大 O 把数据填满，表格看起来都更紧了。", "这一回合不是三双，却很像三面夹击。"]
+  ),
+  legend(
+    { rank: 14, sourcePath: "w/westje01.html", aliases: ["韦斯特", "Logo男", "Jerry West"] },
+    "Jerry West",
+    "1960-1974",
+    "PG / SG",
+    ["Logo", "FMVP", "关键先生"],
+    honors({ championships: 1, finalsMvps: 1, allStars: 14, allNba: 12, allDefense: 5, scoringTitles: 1, assistTitles: 1, hallOfFame: 1, nba75: 1 }),
+    totals({ games: 932, points: 25192, rebounds: 5366, assists: 6238, steals: 81, blocks: 23, ppg: 27.0, rpg: 5.8, apg: 6.7, playoffPoints: 4457, playoffRebounds: 855, playoffAssists: 970 }),
+    { dangerLevel: 91, clutch: 96, legacy: 94, celticsAura: 46 },
+    ["FMVP、最佳阵容和关键球声誉很强，冠军数量是常见争议点。"],
+    ["Logo 男一出手，连图标都像在压迫防线。", "韦斯特的关键先生标签开始发烫。"]
+  ),
+  legend(
+    { rank: 15, sourcePath: "e/ervinju01.html", aliases: ["欧文博士", "J博士", "Dr. J", "Julius Erving"] },
+    "Julius Erving",
+    "1971-1987",
+    "SF",
+    ["J博士", "冠军", "飞翔美学"],
+    honors({ championships: 1, mvps: 1, allStars: 11, allNba: 7, hallOfFame: 1, nba75: 1 }),
+    totals({ games: 836, points: 18364, rebounds: 5601, assists: 3224, steals: 1508, blocks: 1293, ppg: 22.0, rpg: 6.7, apg: 3.9, playoffPoints: 3088, playoffRebounds: 920, playoffAssists: 594 }),
+    { dangerLevel: 90, clutch: 91, legacy: 93, celticsAura: 38 },
+    ["NBA 荣誉之外还有 ABA 履历，本地模型会主要按 NBA 结构化荣誉保守计分。"],
+    ["J 博士起飞之后，地心引力也只能旁观。", "这一扣不是扣篮，是时代审美攻击。"]
+  ),
+  legend(
+    { rank: 16, sourcePath: "m/malonmo01.html", aliases: ["摩西马龙", "Moses"] },
+    "Moses Malone",
+    "1974-1995",
+    "C",
+    ["3x MVP", "FMVP", "篮板机器"],
+    honors({ championships: 1, mvps: 3, finalsMvps: 1, allStars: 12, allNba: 8, allDefense: 2, reboundTitles: 6, hallOfFame: 1, nba75: 1 }),
+    totals({ games: 1329, points: 27409, rebounds: 16212, assists: 1796, steals: 1089, blocks: 1733, ppg: 20.6, rpg: 12.2, apg: 1.4, playoffPoints: 2077, playoffRebounds: 1212, playoffAssists: 157 }),
+    { dangerLevel: 92, clutch: 92, legacy: 94, celticsAura: 22 },
+    ["3 个 MVP 和篮板王数量让他的荣誉值常被低估后重新抬高。"],
+    ["摩西马龙一抢前场板，对面像要再防一局。", "这一击来自篮板深处。"]
+  ),
+  legend(
+    { rank: 17, sourcePath: "j/jokicni01.html", aliases: ["约基奇", "小丑", "Jokic"] },
+    "Nikola Jokic",
+    "2015-至今",
+    "C",
+    ["3x MVP", "FMVP", "组织中锋"],
+    honors({ championships: 1, mvps: 3, finalsMvps: 1, allStars: 7, allNba: 7, nba75: 0 }),
+    totals({ games: 745, points: 16140, rebounds: 8109, assists: 5621, steals: 919, blocks: 529, ppg: 21.7, rpg: 10.9, apg: 7.5, playoffPoints: 2167, playoffRebounds: 1056, playoffAssists: 725 }),
+    { dangerLevel: 94, clutch: 94, legacy: 91, celticsAura: 18 },
+    ["现役荣誉仍在增长，3 个 MVP 已经让他的历史排名争论快速升温。"],
+    ["约基奇慢悠悠一传，战术突然变成谜题。", "小丑不加速，但结算很快。"]
+  ),
+  legend(
+    { rank: 18, sourcePath: "a/antetgi01.html", aliases: ["字母哥", "Giannis", "阿德托昆博"] },
+    "Giannis Antetokounmpo",
+    "2013-至今",
+    "PF",
+    ["2x MVP", "FMVP", "DPOY"],
+    honors({ championships: 1, mvps: 2, finalsMvps: 1, allStars: 9, allNba: 9, allDefense: 5, dpoy: 1, nba75: 1 }),
+    totals({ games: 859, points: 20599, rebounds: 8384, assists: 4207, steals: 990, blocks: 1047, ppg: 24.0, rpg: 9.8, apg: 4.9, playoffPoints: 2201, playoffRebounds: 1036, playoffAssists: 481 }),
+    { dangerLevel: 93, clutch: 91, legacy: 91, celticsAura: 20 },
+    ["MVP、FMVP、DPOY 三件套很完整，现役后续荣誉仍可能改变排序。"],
+    ["字母哥从三分线起步，血条从禁区开始紧张。", "这一回合全是长臂带来的压迫感。"]
+  ),
+  legend(
+    { rank: 19, sourcePath: "g/garneke01.html", aliases: ["加内特", "KG", "狼王"] },
+    "Kevin Garnett",
+    "1995-2016",
+    "PF / C",
+    ["MVP", "DPOY", "冠军防线"],
+    honors({ championships: 1, mvps: 1, allStars: 15, allNba: 9, allDefense: 12, dpoy: 1, hallOfFame: 1, nba75: 1 }),
+    totals({ games: 1462, points: 26071, rebounds: 14662, assists: 5445, steals: 1859, blocks: 2037, ppg: 17.8, rpg: 10.0, apg: 3.7, playoffPoints: 2601, playoffRebounds: 1534, playoffAssists: 471 }),
+    { dangerLevel: 90, clutch: 90, legacy: 93, celticsAura: 87 },
+    ["防守阵容、DPOY 和 MVP 让他在攻防均衡模型里很有优势。"],
+    ["KG 一吼，手动按钮都像被贴防。", "狼王上线，场上空气立刻变硬。"]
+  )
+];
+
+export const opponentPlayers = legendPlayers;
+
+export const allPlayers = [lebronJames, ...legendPlayers, ...celticsPlayers];
