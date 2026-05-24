@@ -337,6 +337,101 @@ function DataComparisonBoard({ opponent }: { opponent: PlayerCard }) {
   );
 }
 
+function ResultModal({
+  open,
+  opponent,
+  state,
+  onClose,
+  onRematch,
+  onSelect
+}: {
+  open: boolean;
+  opponent: PlayerCard;
+  state: BattleState;
+  onClose: () => void;
+  onRematch: () => void;
+  onSelect: () => void;
+}) {
+  const opponentName = getPlayerDisplayName(opponent);
+  const comparison = useMemo(() => buildFullComparison(lebronJames, opponent), [opponent]);
+  const winner =
+    state.finished && state.jamesHp !== state.opponentHp
+      ? state.jamesHp > state.opponentHp
+        ? "james"
+        : "opponent"
+      : comparison.winner;
+  const winnerName = winner === "james" ? "勒布朗·詹姆斯" : winner === "opponent" ? opponentName : "双方平手";
+  const subtitle =
+    winner === "tie"
+      ? "综合数据打到难分高下，这局算是吵架素材拉满。"
+      : `${winnerName} 赢了。下面是完整数据对比，输赢理由直接摊开。`;
+
+  if (!open) {
+    return null;
+  }
+
+  return (
+    <div className="result-backdrop" role="dialog" aria-modal="true" aria-labelledby="result-title">
+      <section className="result-modal">
+        <div className="result-hero">
+          <span>对战结果</span>
+          <h2 id="result-title">{winnerName}赢了</h2>
+          <p>{subtitle}</p>
+          <div className="result-scoreline">
+            <span>
+              勒布朗·詹姆斯
+              <strong>{comparison.jamesScore}</strong>
+            </span>
+            <em>综合分</em>
+            <span>
+              {opponentName}
+              <strong>{comparison.opponentScore}</strong>
+            </span>
+          </div>
+        </div>
+
+        <div className="result-table-wrap">
+          <div className="result-table-head">
+            <span>项目</span>
+            <strong>詹姆斯</strong>
+            <em>{opponentName}</em>
+            <b>领先方</b>
+          </div>
+          <div className="result-table">
+            {comparison.rows.map((row) => (
+              <div className={`result-row ${row.leader}`} key={row.id}>
+                <span>
+                  <small>{row.sourceLabel}</small>
+                  {row.label}
+                </span>
+                <strong>{formatValue(row.jamesValue)}</strong>
+                <em>{formatValue(row.opponentValue)}</em>
+                <b>
+                  {row.leader === "james" ? "詹姆斯" : row.leader === "opponent" ? opponentName : "平手"}
+                </b>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="result-actions">
+          <button className="primary-button" type="button" onClick={onRematch}>
+            <Play size={18} />
+            再打一局
+          </button>
+          <button className="secondary-button" type="button" onClick={onSelect}>
+            <RotateCcw size={18} />
+            重新选卡
+          </button>
+          <button className="secondary-button" type="button" onClick={onClose}>
+            继续查看
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function DetailsDrawer({
   open,
   opponent,
@@ -473,22 +568,32 @@ export default function App() {
   const [phase, setPhase] = useState<"select" | "battle">(initialOpponentId ? "battle" : "select");
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [sourcesOpen, setSourcesOpen] = useState(false);
+  const [resultOpen, setResultOpen] = useState(false);
   const [shareState, setShareState] = useState("复制链接");
 
   const manualMetrics = useMemo(() => getAvailableMetrics(lebronJames, opponent), [opponent]);
 
   useEffect(() => {
     setState(createBattleState(lebronJames, opponent, mode, seed));
+    setResultOpen(false);
   }, [opponent, mode, seed]);
 
   const startBattle = () => {
     const fresh = createBattleState(lebronJames, opponent, mode, seed);
-    setState(mode === "auto" ? resolveAutoBattle(fresh) : fresh);
+    const nextState = mode === "auto" ? resolveAutoBattle(fresh) : fresh;
+    setState(nextState);
     setPhase("battle");
+    setResultOpen(mode === "auto");
   };
 
   const resolveManual = (metricId: string) => {
-    setState((current) => resolveRound(current, metricId));
+    setState((current) => {
+      const nextState = resolveRound(current, metricId);
+      if (nextState.finished) {
+        setResultOpen(true);
+      }
+      return nextState;
+    });
   };
 
   const chooseSeededOpponent = () => {
@@ -505,11 +610,13 @@ export default function App() {
 
   const restart = () => {
     setState(createBattleState(lebronJames, opponent, mode, seed));
+    setResultOpen(false);
   };
 
   const backToSelect = () => {
     setPhase("select");
     setState(createBattleState(lebronJames, opponent, mode, seed));
+    setResultOpen(false);
   };
 
   const copyShare = async () => {
@@ -641,6 +748,14 @@ export default function App() {
 
       <DetailsDrawer open={detailsOpen} opponent={opponent} onClose={() => setDetailsOpen(false)} />
       <SourcesModal open={sourcesOpen} onClose={() => setSourcesOpen(false)} />
+      <ResultModal
+        open={resultOpen}
+        opponent={opponent}
+        state={state}
+        onClose={() => setResultOpen(false)}
+        onRematch={startBattle}
+        onSelect={backToSelect}
+      />
     </main>
   );
 }

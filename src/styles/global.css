@@ -1001,7 +1001,8 @@ button:disabled {
 }
 
 .drawer-backdrop,
-.modal-backdrop {
+.modal-backdrop,
+.result-backdrop {
   position: fixed;
   z-index: 20;
   inset: 0;
@@ -1012,6 +1013,14 @@ button:disabled {
 .drawer-backdrop.open,
 .modal-backdrop {
   display: block;
+}
+
+.result-backdrop {
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.72);
 }
 
 .details-drawer,
@@ -1108,6 +1117,162 @@ button:disabled {
   margin: 0;
   color: var(--muted);
   line-height: 1.65;
+}
+
+.result-modal {
+  width: min(1080px, 100%);
+  max-height: min(880px, calc(100vh - 32px));
+  overflow: hidden;
+  border: 1px solid rgba(227, 187, 98, 0.32);
+  border-radius: 8px;
+  background: #15191d;
+  box-shadow: var(--shadow);
+}
+
+.result-hero {
+  padding: 22px;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(227, 187, 98, 0.22), transparent 18rem),
+    linear-gradient(135deg, rgba(92, 54, 17, 0.64), rgba(18, 92, 57, 0.42));
+}
+
+.result-hero span {
+  color: var(--gold);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.result-hero h2 {
+  margin: 8px 0 10px;
+  font-size: clamp(2.8rem, 8vw, 6.8rem);
+  line-height: 0.92;
+  letter-spacing: 0;
+}
+
+.result-hero p {
+  max-width: 760px;
+  margin: 0;
+  color: rgba(244, 240, 232, 0.84);
+  line-height: 1.65;
+}
+
+.result-scoreline {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  margin-top: 18px;
+}
+
+.result-scoreline span {
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.18);
+  color: var(--muted);
+}
+
+.result-scoreline strong {
+  color: var(--ink);
+  font-size: clamp(2rem, 5vw, 3.6rem);
+  line-height: 1;
+}
+
+.result-scoreline em {
+  color: var(--gold);
+  font-style: normal;
+  font-weight: 900;
+}
+
+.result-table-wrap {
+  padding: 14px;
+}
+
+.result-table-head,
+.result-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1.3fr) minmax(88px, 0.6fr) minmax(88px, 0.6fr) minmax(86px, 0.55fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.result-table-head {
+  padding: 0 10px 8px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.result-table-head strong,
+.result-table-head em,
+.result-table-head b {
+  font-style: normal;
+  text-align: right;
+}
+
+.result-table {
+  display: grid;
+  max-height: 320px;
+  overflow: auto;
+  gap: 7px;
+  padding-right: 4px;
+}
+
+.result-row {
+  min-height: 52px;
+  padding: 9px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.result-row span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  font-weight: 900;
+}
+
+.result-row small {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.result-row strong,
+.result-row em,
+.result-row b {
+  font-style: normal;
+  text-align: right;
+  font-weight: 900;
+}
+
+.result-row strong {
+  color: var(--gold);
+}
+
+.result-row em {
+  color: #9be37f;
+}
+
+.result-row b {
+  color: var(--muted);
+}
+
+.result-row.james b {
+  color: var(--gold);
+}
+
+.result-row.opponent b {
+  color: #9be37f;
+}
+
+.result-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 0 14px 14px;
 }
 
 .app-footer {
@@ -1217,6 +1382,45 @@ button:disabled {
   .honor-ticker-row b {
     grid-column: 1 / -1;
   }
+
+  .result-modal {
+    max-height: calc(100vh - 20px);
+  }
+
+  .result-scoreline {
+    grid-template-columns: 1fr;
+  }
+
+  .result-scoreline em {
+    text-align: center;
+  }
+
+  .result-table-head {
+    display: none;
+  }
+
+  .result-table {
+    max-height: min(360px, 42vh);
+  }
+
+  .result-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .result-row span,
+  .result-row b {
+    grid-column: 1 / -1;
+    text-align: left;
+  }
+
+  .result-row strong,
+  .result-row em {
+    text-align: left;
+  }
+
+  .result-actions {
+    flex-direction: column;
+  }
 }
 
 @media (max-width: 560px) {
@@ -1307,6 +1511,18 @@ button:disabled {
   .detail-row {
     grid-template-columns: 1fr 72px 72px;
     font-size: 0.88rem;
+  }
+
+  .result-backdrop {
+    padding: 8px;
+  }
+
+  .result-hero {
+    padding: 16px;
+  }
+
+  .result-table-wrap {
+    padding: 10px;
   }
 }
 
