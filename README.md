@@ -1,40 +1,39 @@
-# 詹姆斯 VS 历史球星
+# NBA 球队经理线上对抗
 
-一个开源、纯前端、打开链接即可玩的荣誉值对战游戏。玩家固定选择勒布朗·詹姆斯，从精选历史球星池里挑选对手，用总冠军、MVP、FMVP、最佳阵容、防守荣誉和 NBA75 等结构化荣誉进行 4 回合对战。
+一个开源、纯前端、可部署到 GitHub Pages 的球队经理对战游戏。玩家通过房间号和密码创建或加入房间，双方各选五名球星，系统随机抽取每名球员的生涯时期能力，再进行五个回合的经理对抗。
 
-项目还内置了一个本地“荣誉对比 agent”：输入任意两名精选球星的中文名、英文名或常见绰号，就会基于静态资料池输出荣誉值总分、逐项对比、关键争议点和中文分析报告。它不调用后端，也不需要 API Key。
+## 当前玩法
 
-## 玩法
+- 创建房间：输入房间号和密码，等待另一名玩家加入。
+- 加入房间：另一名玩家输入相同房间号和密码即可连接。
+- 选择阵容：双方从 300 人争议球星池中各选 5 名球员。
+- 随机时期：开战时每名球员会随机抽到一个生涯时期，例如詹姆斯骑士 1.0、热火巅峰、骑士 2.0，姚明新秀期、巅峰低位轴心、季后赛硬解版本等。
+- 五回合结算：每一组球员按随机重点能力互相比拼，包括进攻、防守、组织、篮板、运动、关键和气场。
+- 单机试玩：没有对手时也可以随机五人，并让系统补一个电脑/对手阵容。
 
-- 在首页选择一个历史球星作为詹姆斯的对手。
-- 点击“开战”后进入 3-2-1 倒计时。
-- 战斗固定 4 回合，只从荣誉项里结算，不比较总得分、篮板、助攻或媒体印象分。
-- 自动模式会在倒计时后按节奏播放 4 回合。
-- 手动模式需要用户自己选择本回合荣誉项；选择前不会展示双方该项数值，结算后才揭晓。
-- 命中时会播放技能光效、球场震动和 HP 扣减动画；支持浏览器振动 API 的设备会轻微震动。
+## 技术说明
 
-## 精选球星池
+- 前端：React + Vite + TypeScript。
+- 线上房间：PeerJS 浏览器点对点连接。
+- 部署：GitHub Pages。
+- 不需要账号登录，也没有服务器保存对局。
 
-本期默认对手池为 19 位高讨论度历史球星：
+PeerJS 第一版适合轻量双人房间。如果后续需要排行榜、断线重连、观战、反作弊、长期用户数据或真正稳定的公共房间列表，建议升级到 Supabase、Firebase 或自建 WebSocket 后端。
 
-Michael Jordan、Kobe Bryant、Stephen Curry、Magic Johnson、Larry Bird、Bill Russell、Kareem Abdul-Jabbar、Wilt Chamberlain、Shaquille O'Neal、Tim Duncan、Kevin Durant、Hakeem Olajuwon、Oscar Robertson、Jerry West、Julius Erving、Moses Malone、Nikola Jokic、Giannis Antetokounmpo、Kevin Garnett。
+## 球星池
 
-勒布朗·詹姆斯为固定玩家阵营，也可在荣誉 agent 中作为任意一方参与对比。
+本期维护 300 人争议球星池，包括 Michael Jordan、LeBron James、Kobe Bryant、Stephen Curry、Magic Johnson、Larry Bird、Kareem Abdul-Jabbar、姚明、Tracy McGrady、Allen Iverson、Nikola Jokic、Giannis Antetokounmpo、Kevin Durant 等。
+
+前几位历史级球星和姚明拥有手工时期配置，其余球员根据位置、荣誉、争议热度生成三段游戏化时期能力。能力值是娱乐模拟快照，不代表真实排名或实时数据。
 
 ## 数据快照
 
 数据快照日期：**2026-05-24**。
 
-第一版只维护核心荣誉和必要的生涯展示数据，不追求逐场、逐赛季数据库。现役球员后续真实荣誉变化不会自动进入本项目。
-
-## 数据来源
-
 本项目只保存结构化事实、短标签和来源链接，不复制长篇媒体内容。主要参考：
 
-- [NBA.com LeBron James profile](https://www.nba.com/player/2544/lebron-james)
 - [NBA 75th Anniversary Team](https://www.nba.com/news/nba-75th-anniversary-team-announced)
 - [Basketball-Reference Awards Index](https://www.basketball-reference.com/awards/)
-- [Basketball-Reference LeBron James](https://www.basketball-reference.com/players/j/jamesle01.html)
 - [Basketball-Reference player pages](https://www.basketball-reference.com/players/)
 - [Naismith Memorial Basketball Hall of Fame](https://www.hoophall.com/)
 

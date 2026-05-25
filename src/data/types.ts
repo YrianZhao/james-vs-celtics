@@ -94,6 +94,61 @@ export interface PlayerCard {
   trashTalkLines: string[];
 }
 
+export interface EraAbility {
+  id: string;
+  label: string;
+  seasons: string;
+  team: string;
+  offense: number;
+  defense: number;
+  playmaking: number;
+  rebounding: number;
+  athleticism: number;
+  clutch: number;
+  aura: number;
+  summary: string;
+}
+
+export interface ManagerPlayer extends PlayerCard {
+  debateRank: number;
+  eras: EraAbility[];
+}
+
+export interface DraftPick {
+  playerId: string;
+  eraId?: string;
+}
+
+export interface ResolvedDraftPick {
+  player: ManagerPlayer;
+  era: EraAbility;
+  power: number;
+}
+
+export interface ManagerLineupResult {
+  picks: ResolvedDraftPick[];
+  total: number;
+  average: number;
+}
+
+export interface ManagerMatchupRound {
+  slot: number;
+  left: ResolvedDraftPick;
+  right: ResolvedDraftPick;
+  leftScore: number;
+  rightScore: number;
+  winner: "left" | "right" | "tie";
+  focus: keyof EraAbility;
+}
+
+export interface ManagerMatchupResult {
+  seed: string;
+  left: ManagerLineupResult;
+  right: ManagerLineupResult;
+  rounds: ManagerMatchupRound[];
+  winner: "left" | "right" | "tie";
+}
+
 export interface ComparisonMetric {
   id: string;
   label: string;

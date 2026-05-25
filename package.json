@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "A responsive open-source browser honor battle game: LeBron James vs. historical NBA legends.",
+  "description": "A responsive browser-based NBA manager duel game with room-code online play.",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "tsc -b && vite build",
@@ -14,6 +14,7 @@
   "dependencies": {
     "@vitejs/plugin-react": "^5.0.4",
     "lucide-react": "^0.468.0",
+    "peerjs": "^1.5.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "vite": "^5.4.21"
